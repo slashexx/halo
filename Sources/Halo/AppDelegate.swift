@@ -2,32 +2,36 @@ import AppKit
 import Carbon.HIToolbox
 
 /// Owns app-wide lifecycle: the menu-bar item, the global hot key, the overlay
-/// controller, and the settings window.
+/// controller, settings, and first-run onboarding.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private let overlay = OverlayController()
     private let settings = SettingsController()
+    private let onboarding = OnboardingController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupStatusItem()
         setupHotkey()
         ClipboardMonitor.shared.start() // begin remembering copies immediately
 
-        // Debug hook: HALO_DEBUG_SHOW=1 summons the menu at screen center on
-        // launch so it can be inspected without the hot key.
         if ProcessInfo.processInfo.environment["HALO_DEBUG_SHOW"] == "1" {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
                 self?.overlay.showAtScreenCenter()
             }
         }
-
-        // Debug hook: HALO_DEBUG_SNAPSHOT=<path> renders the menu to a PNG
-        // in-process and quits. No Screen Recording permission required.
         if let path = ProcessInfo.processInfo.environment["HALO_DEBUG_SNAPSHOT"] {
             DebugSnapshot.render(to: path)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 NSApplication.shared.terminate(nil)
+            }
+            return
+        }
+
+        // First launch → welcome + permissions.
+        if !AppSettings.didOnboard {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                self?.onboarding.show()
             }
         }
     }
@@ -35,8 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupHotkey() {
         // Trigger: ⌥Tab. A Carbon hot key, so no Accessibility permission needed.
         // Only the press opens the wheel; "release to pick/close" is driven off
-        // the Option key while the wheel is open (see OverlayController), which
-        // matches the natural gesture better than Carbon's Tab-up release.
+        // the Option key while the wheel is open (see OverlayController).
         HotkeyManager.shared.onPressed = { [weak self] in self?.overlay.handlePress() }
         HotkeyManager.shared.register(keyCode: UInt32(kVK_Tab), modifiers: UInt32(optionKey))
     }
@@ -50,11 +53,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
         }
 
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"
+
         let menu = NSMenu()
-        menu.addItem(withTitle: "Halo — dev build", action: nil, keyEquivalent: "")
+        menu.addItem(withTitle: "Halo \(version)", action: nil, keyEquivalent: "")
         menu.addItem(withTitle: "Press ⌥Tab to open", action: nil, keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
+        menu.addItem(withTitle: "Welcome to Halo…", action: #selector(openOnboarding), keyEquivalent: "")
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "GitHub", action: #selector(openGitHub), keyEquivalent: "")
+        menu.addItem(withTitle: "Send Feedback…", action: #selector(sendFeedback), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(
             withTitle: "Quit Halo",
@@ -65,7 +74,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.statusItem = item
     }
 
-    @objc private func openSettings() {
-        settings.show()
+    @objc private func openSettings() { settings.show() }
+    @objc private func openOnboarding() { onboarding.show() }
+
+    @objc private func openGitHub() {
+        NSWorkspace.shared.open(URL(string: "https://github.com/slashexx/halo")!)
+    }
+
+    @objc private func sendFeedback() {
+        NSWorkspace.shared.open(URL(string: "https://github.com/slashexx/halo/issues/new")!)
     }
 }

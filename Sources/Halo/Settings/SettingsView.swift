@@ -7,6 +7,7 @@ struct SettingsView: View {
     @State private var gesture = AppSettings.gestureMode
     @State private var placement = AppSettings.placement
     @State private var clipboardDelay = AppSettings.clipboardHoverDelay
+    @State private var launchAtLogin = LoginItem.isEnabled
 
     var body: some View {
         Form {
@@ -36,8 +37,13 @@ struct SettingsView: View {
                         }
                 }
             }
+
+            Section("General") {
+                Toggle("Launch Halo at login", isOn: $launchAtLogin)
+                    .onChange(of: launchAtLogin) { _, on in LoginItem.setEnabled(on) }
+            }
         }
         .formStyle(.grouped)
-        .frame(width: 440, height: 260)
+        .frame(width: 440, height: 340)
     }
 }

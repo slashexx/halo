@@ -1,66 +1,72 @@
 # Halo
 
-A fast, glassy **pie / radial menu and automation tool for macOS**. Summon a menu
-with a gesture and launch apps, run scripts, insert text, simulate shortcuts,
-manage windows, and chain multi-step workflows — everything at your cursor.
+**Everything at your cursor.** A fast, glassy pie / radial menu and automation
+tool for macOS. Press **⌥Tab** anywhere to summon a wheel and launch apps, run
+scripts, insert text, simulate shortcuts, control media, browse clipboard
+history, and chain multi-step workflows — without leaving what you're doing.
 
-Native **Swift + SwiftUI**, targeting **macOS 26 (Tahoe)** so it can use the real
-Liquid Glass materials. Built with the Swift Package Manager — **no Xcode
-required** to develop.
+Native **Swift + SwiftUI**, built for **macOS 26 (Tahoe)** with real Liquid Glass
+materials. No Xcode required to build — pure Swift Package Manager.
 
-> Status: early development. See the roadmap below.
+## Features
 
-## Requirements
+- **Radial launcher** — a ring of glass buttons; hover to highlight, release ⌥ or
+  click to pick. Open at the cursor or screen center.
+- **Actions** — launch apps, open URLs/files, keyboard shortcuts, AppleScript,
+  shell commands, insert text.
+- **Workflows** — chain actions into one item with a visual editor.
+- **Clipboard history** — the last 10 copies (text, images, files) as an ordered
+  side-list; pick one to make it current.
+- **Media hub** — the center circle flips to now-playing (Spotify, Apple Music,
+  and browser media) with album art + transport controls; swipe between sources.
+- **Customizable** — click an empty slot to add an app, right-click to
+  replace/remove; everything persists.
+- **Configurable trigger** — hold-&-release or press-to-toggle, your choice.
 
-- macOS 26+
-- Swift 6.0+ toolchain (`swift --version`) — Xcode _or_ Command Line Tools
+## Install
 
-## Build & run
+Download the latest **`Halo.dmg`** from
+[Releases](https://github.com/slashexx/halo/releases), open it, and drag **Halo**
+to Applications.
+
+> The current build is **not yet notarized**, so on first launch macOS Gatekeeper
+> will warn. Right-click **Halo.app → Open → Open**, or run
+> `xattr -dr com.apple.quarantine /Applications/Halo.app`. (Notarized builds are
+> coming.)
+
+Halo lives in the **menu bar** (no Dock icon). First launch shows a short welcome
+that requests the permissions it needs.
+
+## Build from source
 
 ```bash
-# Build, assemble Halo.app, and run it with logs in this terminal:
-./scripts/run.sh
-
-# Or just build the .app bundle:
-./scripts/bundle.sh          # debug
-./scripts/bundle.sh release  # optimized
+./scripts/run.sh              # build + run with logs (Ctrl-C to quit)
+./scripts/bundle.sh release   # just build Halo.app (optimized)
+./scripts/make-icon.sh        # regenerate the app icon
+./scripts/dmg.sh              # build a release DMG
 ```
 
-Halo runs as a **menu-bar agent** (no Dock icon). **Press ⌥Tab** (Option+Tab) to
-open the menu; press it again, hit Esc, or click outside to dismiss. Quit from the
-menu-bar icon or with `Ctrl-C` in the terminal.
+Requires macOS 26+ and a Swift 6 toolchain (Xcode **or** Command Line Tools).
 
 ### Permissions
 
-The ⌥Tab trigger is a Carbon hot key and needs **no permissions**. Later phases
-add actions that inject keystrokes or move windows; those will request
-**Accessibility** the first time they're used. (Because the dev build is ad-hoc
-signed, its signature changes each build, so macOS may re-ask for Accessibility
-after a rebuild.)
-
-## Architecture (target)
-
-- **Overlay** — borderless transparent floating `NSPanel` summoned at the cursor
-  or screen center, hosting a SwiftUI radial menu with Liquid Glass materials.
-- **Trigger** — global hot key (⌥Tab).
-- **Model** — `Codable` menus; an item is either an *action* or a *sub-menu*.
-  Persisted as JSON; presets are shareable JSON files.
-- **Actions** — 16 building blocks behind an `Action` protocol (`execute()`):
-  launch app, open URL/file, keyboard shortcut, insert text, run script,
-  window management, system actions, chain, …
-- **Context** — picks a per-app menu based on the frontmost application.
-- **Editor** — SwiftUI window to build menus visually.
+- **⌥Tab trigger** — none (Carbon hot key).
+- **Accessibility** — for keyboard-shortcut / insert-text / media-key actions.
+- **Automation** — asked per-app the first time Halo scripts Spotify, Music, or a
+  browser.
 
 ## Roadmap
 
-- [x] **Phase 0** — project scaffold (SwiftPM, bundle script, menu-bar agent)
-- [x] **Phase 1** — glass radial overlay + global trigger
-- [ ] **Phase 2** — action engine + core actions
-- [ ] **Phase 3** — menu model, persistence, sub-menus, chaining
-- [ ] **Phase 4** — context-aware menus
-- [ ] **Phase 5** — remaining actions (window mgmt, system, app switcher)
-- [ ] **Phase 6** — visual editor UI
-- [ ] **Phase 7** — preset import/export, polish, docs
+- [x] Glass radial overlay + ⌥Tab trigger
+- [x] Action engine (launch, URL, shortcut, script, text)
+- [x] Customizable, persisted wheel + app picker
+- [x] Clipboard history
+- [x] Workflows (chained actions) + editor
+- [x] Media player hub
+- [x] Onboarding + permissions, app icon, launch-at-login
+- [ ] Context-aware per-app menus
+- [ ] Preset import/export + community
+- [ ] Notarized release + auto-update
 
 ## License
 

@@ -19,6 +19,11 @@ cp "$BUILD_DIR/$APP_NAME" "$CONTENTS/MacOS/$APP_NAME"
 cp "$ROOT/Resources/Info.plist" "$CONTENTS/Info.plist"
 printf 'APPL????' > "$CONTENTS/PkgInfo"
 
+# App icon (generate once with scripts/make-icon.sh).
+if [ -f "$ROOT/Resources/AppIcon.icns" ]; then
+    cp "$ROOT/Resources/AppIcon.icns" "$CONTENTS/Resources/AppIcon.icns"
+fi
+
 # Ad-hoc sign so the bundle has a stable identity for any TCC prompts. Note:
 # the ad-hoc cdhash changes each build, so grants keyed to the signature (e.g.
 # Accessibility, used later for keystroke/window actions) may need re-granting

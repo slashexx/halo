@@ -36,6 +36,12 @@ enum AppSettings {
     private static let placementKey = "overlayPlacement"
     private static let gestureKey = "gestureMode"
     private static let clipboardDelayKey = "clipboardHoverDelay"
+    private static let onboardedKey = "didOnboard"
+
+    static var didOnboard: Bool {
+        get { UserDefaults.standard.bool(forKey: onboardedKey) }
+        set { UserDefaults.standard.set(newValue, forKey: onboardedKey) }
+    }
 
     static var placement: OverlayPlacement {
         get { OverlayPlacement(rawValue: UserDefaults.standard.string(forKey: placementKey) ?? "") ?? .center }

@@ -1,10 +1,9 @@
 import AppKit
 import SwiftUI
 
-/// Presents the Settings window. Reuses one instance; switches to a regular
-/// activation policy while open so controls behave normally.
+/// Presents the first-run onboarding window.
 @MainActor
-final class SettingsController: NSObject, NSWindowDelegate {
+final class OnboardingController: NSObject, NSWindowDelegate {
     private var window: NSWindow?
 
     func show() {
@@ -15,13 +14,15 @@ final class SettingsController: NSObject, NSWindowDelegate {
         }
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 440, height: 340),
+            contentRect: NSRect(x: 0, y: 0, width: 500, height: 560),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
-        window.title = "Halo Settings"
-        window.contentView = NSHostingView(rootView: SettingsView())
+        window.title = "Welcome to Halo"
+        window.contentView = NSHostingView(rootView: OnboardingView(onDone: { [weak self] in
+            self?.window?.close()
+        }))
         window.isReleasedWhenClosed = false
         window.delegate = self
         window.center()
@@ -32,6 +33,7 @@ final class SettingsController: NSObject, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
+        AppSettings.didOnboard = true
         window = nil
         AppActivation.end()
     }
