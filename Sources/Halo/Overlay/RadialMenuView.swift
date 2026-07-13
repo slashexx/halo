@@ -10,6 +10,7 @@ struct RadialMenuView: View {
     var onActivate: (Int) -> Void        // ring slot
     var onActivateClip: (Int) -> Void    // clipboard row
     var onEdit: (Int) -> Void            // set or replace a slot
+    var onEditWorkflow: (Int) -> Void    // edit a workflow slot
     var onClear: (Int) -> Void           // empty a slot
     var onCloseClipboard: () -> Void
     var onDismiss: () -> Void
@@ -28,6 +29,7 @@ struct RadialMenuView: View {
         onActivate: @escaping (Int) -> Void,
         onActivateClip: @escaping (Int) -> Void = { _ in },
         onEdit: @escaping (Int) -> Void,
+        onEditWorkflow: @escaping (Int) -> Void = { _ in },
         onClear: @escaping (Int) -> Void,
         onCloseClipboard: @escaping () -> Void = {},
         onDismiss: @escaping () -> Void
@@ -36,6 +38,7 @@ struct RadialMenuView: View {
         self.onActivate = onActivate
         self.onActivateClip = onActivateClip
         self.onEdit = onEdit
+        self.onEditWorkflow = onEditWorkflow
         self.onClear = onClear
         self.onCloseClipboard = onCloseClipboard
         self.onDismiss = onDismiss
@@ -139,7 +142,7 @@ struct RadialMenuView: View {
                 .modifier(RingItem(isHighlighted: isHighlighted))
                 .contextMenu {
                     if item.kind == .action, case .chain? = item.action {
-                        Button("Edit workflow…") { onEdit(index) }
+                        Button("Edit workflow…") { onEditWorkflow(index) }
                     }
                     Button("Replace…") { onEdit(index) }
                     Button("Remove", role: .destructive) { onClear(index) }

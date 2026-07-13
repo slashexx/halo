@@ -9,6 +9,7 @@ final class OverlayController {
     private let panelSize = NSSize(width: 1000, height: 560)
     private let model = RadialMenuModel()
     private let picker = AppPickerController()
+    private let workflowEditor = WorkflowEditorController()
 
     private var panel: OverlayPanel?
     private var keyMonitor: Any?
@@ -114,6 +115,7 @@ final class OverlayController {
             onActivate: { [weak self] index in self?.activate(index) },
             onActivateClip: { [weak self] index in self?.activateClip(index) },
             onEdit: { [weak self] index in self?.editSlot(index) },
+            onEditWorkflow: { [weak self] index in self?.editWorkflow(index) },
             onClear: { [weak self] index in self?.model.setSlot(index, to: nil) },
             onCloseClipboard: { [weak self] in self?.model.closeClipboard() },
             onDismiss: { [weak self] in self?.hide() }
@@ -193,10 +195,29 @@ final class OverlayController {
                     kind: .clipboard
                 ))
             case .newWorkflow:
-                HaloAction.runAppleScript(
-                    #"display notification "Workflow builder is coming soon" with title "Halo""#
-                ).execute()
+                self.openWorkflowEditor(index: index, name: "Workflow", steps: [])
             }
+        }
+    }
+
+    /// Edit an existing workflow slot (its action is a `.chain`).
+    private func editWorkflow(_ index: Int) {
+        guard let item = model.item(at: index),
+              case .chain(let actions)? = item.action else { return }
+        hide()
+        openWorkflowEditor(index: index, name: item.title, steps: actions.map(WorkflowStep.init(action:)))
+    }
+
+    private func openWorkflowEditor(index: Int, name: String, steps: [WorkflowStep]) {
+        workflowEditor.present(name: name, steps: steps) { [weak self] name, steps in
+            guard let self else { return }
+            let actions = steps.map(\.action)
+            let title = name.trimmingCharacters(in: .whitespaces)
+            self.model.setSlot(index, to: MenuItem(
+                title: title.isEmpty ? "Workflow" : title,
+                icon: .symbol("square.stack.3d.up.fill"),
+                action: .chain(actions)
+            ))
         }
     }
 
