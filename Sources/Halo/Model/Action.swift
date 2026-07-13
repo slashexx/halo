@@ -26,10 +26,24 @@ struct KeyCombo: Equatable, Codable {
     }
 }
 
+/// Where to place the frontmost window.
+enum WindowPosition: String, Codable, CaseIterable, Identifiable {
+    case leftHalf, rightHalf, topHalf, bottomHalf, maximize, center
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .leftHalf: "Left Half"
+        case .rightHalf: "Right Half"
+        case .topHalf: "Top Half"
+        case .bottomHalf: "Bottom Half"
+        case .maximize: "Maximize"
+        case .center: "Center"
+        }
+    }
+}
+
 /// One executable action — the building block a menu item runs when chosen.
-///
-/// Phase 2 implements the five core blocks below. Later phases add window
-/// management, system actions, app switcher, and chaining (workflows).
 enum HaloAction: Equatable, Codable {
     case launchApp(name: String)          // app name or bundle id, via `open -a`
     case openURL(String)                  // https URL, custom scheme, file, or folder
@@ -37,14 +51,31 @@ enum HaloAction: Equatable, Codable {
     case runAppleScript(String)           // execute AppleScript source
     case runShell(String)                 // run a shell command
     case insertText(String)               // type text into the focused field
+    case moveWindow(WindowPosition)       // reposition the frontmost window
     indirect case chain([HaloAction])     // a workflow: run steps in sequence
 
-    /// Whether executing requires Accessibility (keystroke / text injection).
+    /// Whether executing requires Accessibility (keystroke/text injection, or
+    /// moving another app's window).
     var needsAccessibility: Bool {
         switch self {
-        case .keyboardShortcut, .insertText: return true
+        case .keyboardShortcut, .insertText, .moveWindow: return true
         case .chain(let steps): return steps.contains { $0.needsAccessibility }
         default: return false
+        }
+    }
+
+    /// Whether the action is worth running (skips empty text/app/script steps).
+    var isMeaningful: Bool {
+        func filled(_ s: String) -> Bool { !s.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        switch self {
+        case .launchApp(let n): return filled(n)
+        case .openURL(let s): return filled(s)
+        case .runAppleScript(let s): return filled(s)
+        case .runShell(let s): return filled(s)
+        case .insertText(let s): return !s.isEmpty
+        case .keyboardShortcut(let c): return c.keyCode != 0 || !c.modifiers.isEmpty
+        case .moveWindow: return true
+        case .chain(let steps): return steps.contains { $0.isMeaningful }
         }
     }
 

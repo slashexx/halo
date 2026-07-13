@@ -19,6 +19,7 @@ enum ActionRunner {
         case .runAppleScript(let source): runAppleScript(source)
         case .runShell(let command): runShell(command)
         case .insertText(let text): typeText(text)
+        case .moveWindow(let position): WindowManager.move(position)
         case .chain(let steps): runChain(steps, from: 0)
         }
     }
@@ -38,21 +39,33 @@ enum ActionRunner {
     // MARK: - Launch / open
 
     private static func launchApp(_ name: String) {
-        runProcess("/usr/bin/open", ["-a", name])
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { NSLog("Halo: 'Launch App' step is empty — skipped."); return }
+        runProcess("/usr/bin/open", ["-a", trimmed], label: "launch \(trimmed)")
     }
 
     private static func openTarget(_ target: String) {
-        if let url = URL(string: target), url.scheme != nil {
+        let trimmed = target.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Never fall through to URL(fileURLWithPath: "") — that opens "/" (the
+        // "Macintosh HD" Finder window). Empty / unknown targets no-op + log.
+        guard !trimmed.isEmpty else { NSLog("Halo: 'Open URL/File' step is empty — skipped."); return }
+
+        if let url = URL(string: trimmed), let scheme = url.scheme, !scheme.isEmpty {
             NSWorkspace.shared.open(url)
-        } else {
-            let expanded = (target as NSString).expandingTildeInPath
+            return
+        }
+        let expanded = (trimmed as NSString).expandingTildeInPath
+        if FileManager.default.fileExists(atPath: expanded) {
             NSWorkspace.shared.open(URL(fileURLWithPath: expanded))
+        } else {
+            NSLog("Halo: 'Open URL/File' — '%@' is not a URL or an existing path; skipped.", trimmed)
         }
     }
 
     // MARK: - Scripts
 
     private static func runAppleScript(_ source: String) {
+        guard !source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         var error: NSDictionary?
         NSAppleScript(source: source)?.executeAndReturnError(&error)
         if let error {
@@ -61,17 +74,45 @@ enum ActionRunner {
     }
 
     private static func runShell(_ command: String) {
-        runProcess("/bin/zsh", ["-lc", command])
+        let trimmed = command.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        // Login shell + augmented PATH so Homebrew / user CLIs (e.g. `claude`)
+        // resolve; run from home; capture output so failures are visible.
+        runProcess("/bin/zsh", ["-lc", trimmed], label: "shell",
+                   augmentPath: true, cwd: NSHomeDirectory())
     }
 
-    private static func runProcess(_ launchPath: String, _ arguments: [String]) {
+    private static func runProcess(
+        _ launchPath: String, _ arguments: [String], label: String,
+        augmentPath: Bool = false, cwd: String? = nil
+    ) {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: launchPath)
         process.arguments = arguments
+        if let cwd { process.currentDirectoryURL = URL(fileURLWithPath: cwd) }
+        if augmentPath {
+            var env = ProcessInfo.processInfo.environment
+            let extras = "/opt/homebrew/bin:/usr/local/bin:\(NSHomeDirectory())/.local/bin"
+            env["PATH"] = extras + ":" + (env["PATH"] ?? "/usr/bin:/bin")
+            process.environment = env
+        }
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        process.terminationHandler = { proc in
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            guard proc.terminationStatus != 0 else { return }
+            let out = String(data: data, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            NSLog("Halo: %@ failed (exit %d)%@", label, proc.terminationStatus,
+                  out.isEmpty ? "" : ": " + out)
+        }
+
         do {
-            try process.run() // fire-and-forget; we don't block on completion
+            try process.run()
         } catch {
-            NSLog("Halo: failed to run %@: %@", launchPath, error.localizedDescription)
+            NSLog("Halo: %@ could not start: %@", label, error.localizedDescription)
         }
     }
 

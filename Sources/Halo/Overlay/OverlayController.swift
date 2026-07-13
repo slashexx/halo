@@ -16,7 +16,9 @@ final class OverlayController {
     private var keyMonitor: Any?
     private var globalMouseMonitor: Any?
     private var flagsMonitor: Any?
+    private var scrollMonitor: Any?
     private var wasOptionDown = false
+    private var lastScrollSwitch: TimeInterval = 0
     private(set) var isVisible = false
 
     // Gesture state for hold-and-release / tap-to-stick.
@@ -199,7 +201,8 @@ final class OverlayController {
                     kind: .clipboard
                 ))
             case .newWorkflow:
-                self.openWorkflowEditor(index: index, name: "Workflow", steps: [])
+                self.openWorkflowEditor(index: index, name: "Workflow",
+                                        symbol: "square.stack.3d.up.fill", steps: [])
             }
         }
     }
@@ -208,18 +211,20 @@ final class OverlayController {
     private func editWorkflow(_ index: Int) {
         guard let item = model.item(at: index),
               case .chain(let actions)? = item.action else { return }
+        let symbol: String = if case .symbol(let name) = item.icon { name } else { "square.stack.3d.up.fill" }
         hide()
-        openWorkflowEditor(index: index, name: item.title, steps: actions.map(WorkflowStep.init(action:)))
+        openWorkflowEditor(index: index, name: item.title, symbol: symbol,
+                           steps: actions.map(WorkflowStep.init(action:)))
     }
 
-    private func openWorkflowEditor(index: Int, name: String, steps: [WorkflowStep]) {
-        workflowEditor.present(name: name, steps: steps) { [weak self] name, steps in
+    private func openWorkflowEditor(index: Int, name: String, symbol: String, steps: [WorkflowStep]) {
+        workflowEditor.present(name: name, symbol: symbol, steps: steps) { [weak self] name, symbol, steps in
             guard let self else { return }
-            let actions = steps.map(\.action)
+            let actions = steps.map(\.action).filter(\.isMeaningful) // drop empty steps
             let title = name.trimmingCharacters(in: .whitespaces)
             self.model.setSlot(index, to: MenuItem(
                 title: title.isEmpty ? "Workflow" : title,
-                icon: .symbol("square.stack.3d.up.fill"),
+                icon: .symbol(symbol),
                 action: .chain(actions)
             ))
         }
@@ -263,6 +268,19 @@ final class OverlayController {
             return event
         }
 
+        // Two-finger trackpad swipe over the hub switches media sources.
+        scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            guard let self, self.model.hubFocused else { return event }
+            let dx = event.scrollingDeltaX
+            guard abs(dx) > 6, abs(dx) > abs(event.scrollingDeltaY) else { return event }
+            let now = ProcessInfo.processInfo.systemUptime
+            if now - self.lastScrollSwitch > 0.35 {
+                self.lastScrollSwitch = now
+                if dx < 0 { self.media.switchNext() } else { self.media.switchPrevious() }
+            }
+            return nil // consume horizontal swipes while on the hub
+        }
+
         // Dismiss on a click outside the panel. Left-only so right-clicks (which
         // open a slot's context menu inside the panel) are never misread.
         globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(
@@ -276,9 +294,11 @@ final class OverlayController {
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
         if let globalMouseMonitor { NSEvent.removeMonitor(globalMouseMonitor) }
         if let flagsMonitor { NSEvent.removeMonitor(flagsMonitor) }
+        if let scrollMonitor { NSEvent.removeMonitor(scrollMonitor) }
         keyMonitor = nil
         globalMouseMonitor = nil
         flagsMonitor = nil
+        scrollMonitor = nil
         wasOptionDown = false
     }
 }

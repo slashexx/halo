@@ -7,6 +7,8 @@ struct MediaPlayerFace: View {
     @ObservedObject var media: MediaHubModel
     let size: CGFloat
 
+    @State private var flipAngle = 0.0
+
     var body: some View {
         ZStack {
             background
@@ -15,6 +17,9 @@ struct MediaPlayerFace: View {
         }
         .frame(width: size, height: size)
         .clipShape(.circle)
+        .rotation3DEffect(.degrees(flipAngle), axis: (x: 0, y: 1, z: 0), perspective: 0.4)
+        // Same coin-flip whenever the source changes (drag or two-finger swipe).
+        .onChange(of: media.currentIndex) { _, _ in flipOnSwitch() }
         .gesture(
             DragGesture(minimumDistance: 24)
                 .onEnded { value in
@@ -22,6 +27,16 @@ struct MediaPlayerFace: View {
                     else if value.translation.width > 24 { media.switchPrevious() }
                 }
         )
+    }
+
+    /// Flip out to the edge, swap (content already updated), flip back in — no
+    /// mirrored text, reads like the hub's coin flip.
+    private func flipOnSwitch() {
+        withAnimation(.easeIn(duration: 0.14)) { flipAngle = 88 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) {
+            flipAngle = -88
+            withAnimation(.easeOut(duration: 0.16)) { flipAngle = 0 }
+        }
     }
 
     @ViewBuilder
