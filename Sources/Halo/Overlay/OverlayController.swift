@@ -15,6 +15,8 @@ final class OverlayController {
     private var panel: OverlayPanel?
     private var keyMonitor: Any?
     private var globalMouseMonitor: Any?
+    private var flagsMonitor: Any?
+    private var wasOptionDown = false
     private(set) var isVisible = false
 
     // Gesture state for hold-and-release / tap-to-stick.
@@ -246,6 +248,21 @@ final class OverlayController {
             }
         }
 
+        // Drive "release to pick/close" off the Option key (not Carbon's Tab-up),
+        // matching the natural hold-⌥, navigate, lift-⌥ gesture. The panel is key
+        // so modifier changes route to us — no Accessibility needed. Seed the
+        // state from the current flags (Option is held when the wheel opens).
+        wasOptionDown = NSEvent.modifierFlags.contains(.option)
+        flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+            guard let self else { return event }
+            let optionDown = event.modifierFlags.contains(.option)
+            if self.wasOptionDown && !optionDown {
+                self.handleRelease()
+            }
+            self.wasOptionDown = optionDown
+            return event
+        }
+
         // Dismiss on a click outside the panel. Left-only so right-clicks (which
         // open a slot's context menu inside the panel) are never misread.
         globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(
@@ -258,7 +275,10 @@ final class OverlayController {
     private func removeMonitors() {
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
         if let globalMouseMonitor { NSEvent.removeMonitor(globalMouseMonitor) }
+        if let flagsMonitor { NSEvent.removeMonitor(flagsMonitor) }
         keyMonitor = nil
         globalMouseMonitor = nil
+        flagsMonitor = nil
+        wasOptionDown = false
     }
 }

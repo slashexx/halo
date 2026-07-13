@@ -9,7 +9,7 @@ final class MediaHubModel: ObservableObject {
     @Published var currentIndex = 0
     @Published private(set) var artwork: NSImage?
 
-    private let providers: [MediaProvider] = [SpotifyProvider(), MusicProvider()]
+    private let providers: [MediaProvider] = [SpotifyProvider(), MusicProvider(), BrowserMediaProvider()]
 
     var current: NowPlaying? {
         sources.indices.contains(currentIndex) ? sources[currentIndex] : nil

@@ -34,9 +34,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupHotkey() {
         // Trigger: ⌥Tab. A Carbon hot key, so no Accessibility permission needed.
-        // Press/release both routed so the gesture setting can use either.
+        // Only the press opens the wheel; "release to pick/close" is driven off
+        // the Option key while the wheel is open (see OverlayController), which
+        // matches the natural gesture better than Carbon's Tab-up release.
         HotkeyManager.shared.onPressed = { [weak self] in self?.overlay.handlePress() }
-        HotkeyManager.shared.onReleased = { [weak self] in self?.overlay.handleRelease() }
         HotkeyManager.shared.register(keyCode: UInt32(kVK_Tab), modifiers: UInt32(optionKey))
     }
 
