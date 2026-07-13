@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleExecutable</key>
+    <string>Halo</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.openhalo.Halo</string>
+    <key>CFBundleName</key>
+    <string>Halo</string>
+    <key>CFBundleDisplayName</key>
+    <string>Halo</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>26.0</string>
+    <!-- Agent app: no Dock icon, lives in the menu bar. -->
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Halo runs the AppleScript and automation actions you configure.</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>MIT Licensed. See LICENSE.</string>
+</dict>
+</plist>
