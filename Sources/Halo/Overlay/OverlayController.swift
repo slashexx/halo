@@ -8,6 +8,7 @@ final class OverlayController {
     // Wide enough for the wheel plus the clipboard list beside it.
     private let panelSize = NSSize(width: 1000, height: 560)
     private let model = RadialMenuModel()
+    private let media = MediaHubModel()
     private let picker = AppPickerController()
     private let workflowEditor = WorkflowEditorController()
 
@@ -112,6 +113,7 @@ final class OverlayController {
         let panel = OverlayPanel(size: panelSize)
         let root = RadialMenuView(
             model: model,
+            media: media,
             onActivate: { [weak self] index in self?.activate(index) },
             onActivateClip: { [weak self] index in self?.activateClip(index) },
             onEdit: { [weak self] index in self?.editSlot(index) },

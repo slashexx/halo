@@ -9,6 +9,7 @@ final class RadialMenuModel: ObservableObject {
 
     @Published var slots: [MenuItem?]
     @Published var clipboardOpen = false
+    @Published var hubFocused = false           // cursor is over the center hub
     @Published var highlightedIndex: Int?       // ring slot under the cursor
     @Published var highlightedClipIndex: Int?   // clipboard row under the cursor
 
@@ -33,6 +34,7 @@ final class RadialMenuModel: ObservableObject {
 
     func reset() {
         clipboardOpen = false
+        hubFocused = false
         highlightedIndex = nil
         highlightedClipIndex = nil
     }

@@ -6,6 +6,7 @@ import SwiftUI
 /// slot runs an action; an empty slot shows ＋ to add.
 struct RadialMenuView: View {
     @ObservedObject var model: RadialMenuModel
+    @ObservedObject var media: MediaHubModel
 
     var onActivate: (Int) -> Void        // ring slot
     var onActivateClip: (Int) -> Void    // clipboard row
@@ -17,14 +18,15 @@ struct RadialMenuView: View {
 
     @State private var appeared: Bool
 
-    private let ringRadius: CGFloat = 128
-    private let itemSize: CGFloat = 62
-    private let hubSize: CGFloat = 96
-    private let deadZone: CGFloat = 46
-    private let listOffsetX: CGFloat = 300
+    private let ringRadius: CGFloat = 132
+    private let itemSize: CGFloat = 60
+    private let hubSize: CGFloat = 160
+    private var hubRadius: CGFloat { hubSize / 2 }
+    private let listOffsetX: CGFloat = 320
 
     init(
         model: RadialMenuModel,
+        media: MediaHubModel = MediaHubModel(),
         startVisible: Bool = false,
         onActivate: @escaping (Int) -> Void,
         onActivateClip: @escaping (Int) -> Void = { _ in },
@@ -35,6 +37,7 @@ struct RadialMenuView: View {
         onDismiss: @escaping () -> Void
     ) {
         self._model = ObservedObject(wrappedValue: model)
+        self._media = ObservedObject(wrappedValue: media)
         self.onActivate = onActivate
         self.onActivateClip = onActivateClip
         self.onEdit = onEdit
@@ -86,6 +89,8 @@ struct RadialMenuView: View {
         .onTapGesture {
             if model.clipboardOpen {
                 onCloseClipboard()
+            } else if model.hubFocused {
+                // Taps on the hub are handled by the player's own controls.
             } else if let index = model.highlightedIndex {
                 onActivate(index)
             } else {
@@ -102,6 +107,15 @@ struct RadialMenuView: View {
                 model.openClipboard()
             }
         }
+        // Keep the media hub fresh while the cursor is on it.
+        .task(id: model.hubFocused) {
+            guard model.hubFocused else { return }
+            media.refresh()
+            while !Task.isCancelled && model.hubFocused {
+                try? await Task.sleep(for: .seconds(1.2))
+                if model.hubFocused { media.refresh() }
+            }
+        }
     }
 
     private var dwellKey: String {
@@ -111,24 +125,38 @@ struct RadialMenuView: View {
     // MARK: - Hub
 
     private var hub: some View {
-        Group {
-            if let index = model.highlightedIndex, let item = model.item(at: index) {
-                Text(item.title).modifier(HubLabel())
-            } else if model.highlightedIndex != nil {
-                VStack(spacing: 2) {
-                    Image(systemName: "plus.circle.fill").font(.system(size: 20, weight: .semibold))
-                    Text("Add").font(.system(size: 12, weight: .medium))
-                }
-                .foregroundStyle(.primary)
-            } else {
-                Image(systemName: "hand.tap.fill")
-                    .font(.system(size: 22, weight: .medium))
-                    .foregroundStyle(.primary)
-            }
+        ZStack {
+            hubFront
+                .frame(width: hubSize, height: hubSize)
+                .glassEffect(.regular, in: .circle)
+                .opacity(model.hubFocused ? 0 : 1)
+
+            MediaPlayerFace(media: media, size: hubSize)
+                .opacity(model.hubFocused ? 1 : 0)
+                .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0)) // un-mirror
         }
-        .frame(width: hubSize, height: hubSize)
-        .glassEffect(.regular, in: .circle)
-        .shadow(color: .black.opacity(0.16), radius: 9, y: 2)
+        .rotation3DEffect(.degrees(model.hubFocused ? 180 : 0), axis: (x: 0, y: 1, z: 0))
+        .shadow(color: .black.opacity(0.18), radius: 12, y: 3)
+        .animation(.smooth(duration: 0.38), value: model.hubFocused)
+    }
+
+    @ViewBuilder
+    private var hubFront: some View {
+        if let index = model.highlightedIndex, let item = model.item(at: index) {
+            Text(item.title).modifier(HubLabel())
+        } else if model.highlightedIndex != nil {
+            VStack(spacing: 2) {
+                Image(systemName: "plus.circle.fill").font(.system(size: 22, weight: .semibold))
+                Text("Add").font(.system(size: 13, weight: .medium))
+            }
+            .foregroundStyle(.primary)
+        } else {
+            VStack(spacing: 4) {
+                Image(systemName: "play.circle").font(.system(size: 26, weight: .medium))
+                Text("Media").font(.system(size: 12, weight: .medium)).foregroundStyle(.secondary)
+            }
+            .foregroundStyle(.primary)
+        }
     }
 
     // MARK: - Slot views
@@ -190,10 +218,20 @@ struct RadialMenuView: View {
     }
 
     private func updateHighlight(at location: CGPoint, center: CGPoint, count: Int) {
-        guard count > 0 else { model.highlightedIndex = nil; return }
         let dx = location.x - center.x
         let dy = location.y - center.y
-        guard hypot(dx, dy) > deadZone else {
+        let distance = hypot(dx, dy)
+
+        // Inside the hub circle → focus the media player, no ring selection.
+        if distance <= hubRadius {
+            if !model.hubFocused { model.hubFocused = true }
+            if model.highlightedIndex != nil { model.highlightedIndex = nil }
+            return
+        }
+        if model.hubFocused { model.hubFocused = false }
+
+        guard count > 0 else { model.highlightedIndex = nil; return }
+        guard distance > hubRadius else {
             if model.highlightedIndex != nil { model.highlightedIndex = nil }
             return
         }
