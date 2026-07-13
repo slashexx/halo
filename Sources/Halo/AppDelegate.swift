@@ -36,6 +36,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Halo is a menu-bar agent with no window, so opening it again from
+    /// Spotlight/Finder/Dock would otherwise do nothing visible. Show the
+    /// welcome window instead — it explains the menu-bar icon and ⌥Tab.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        onboarding.show()
+        return true
+    }
+
     private func setupHotkey() {
         // Trigger: ⌥Tab. A Carbon hot key, so no Accessibility permission needed.
         // Only the press opens the wheel; "release to pick/close" is driven off

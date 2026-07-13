@@ -17,6 +17,7 @@ struct OnboardingView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     trigger
+                    menuBarNote
                     accessibilityRow
                     automationRow
                     Toggle("Launch Halo at login", isOn: $launchAtLogin)
@@ -65,6 +66,19 @@ struct OnboardingView: View {
             }
         } icon: {
             Image(systemName: "circle.hexagongrid.fill").foregroundStyle(.tint).font(.title2)
+        }
+    }
+
+    private var menuBarNote: some View {
+        Label {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Lives in the menu bar").fontWeight(.semibold)
+                Text("No Dock icon — look for the ⬡ icon in the top-right menu bar. "
+                    + "If it's hidden behind the notch, ⌘-drag menu-bar icons to make room.")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+        } icon: {
+            Image(systemName: "menubar.arrow.up.rectangle").foregroundStyle(.tint).font(.title2)
         }
     }
 
