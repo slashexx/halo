@@ -6,6 +6,7 @@ import SwiftUI
 struct SettingsView: View {
     @State private var gesture = AppSettings.gestureMode
     @State private var placement = AppSettings.placement
+    @State private var clipboardDelay = AppSettings.clipboardHoverDelay
 
     var body: some View {
         Form {
@@ -23,6 +24,17 @@ struct SettingsView: View {
                     ForEach(OverlayPlacement.allCases) { Text($0.title).tag($0) }
                 }
                 .onChange(of: placement) { _, newValue in AppSettings.placement = newValue }
+            }
+
+            Section("Clipboard") {
+                VStack(alignment: .leading) {
+                    LabeledContent("Open after hover",
+                                   value: String(format: "%.1f s", clipboardDelay))
+                    Slider(value: $clipboardDelay, in: 0.2...1.5, step: 0.1)
+                        .onChange(of: clipboardDelay) { _, newValue in
+                            AppSettings.clipboardHoverDelay = newValue
+                        }
+                }
             }
         }
         .formStyle(.grouped)

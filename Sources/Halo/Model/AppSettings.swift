@@ -35,6 +35,7 @@ enum GestureMode: String, CaseIterable, Identifiable {
 enum AppSettings {
     private static let placementKey = "overlayPlacement"
     private static let gestureKey = "gestureMode"
+    private static let clipboardDelayKey = "clipboardHoverDelay"
 
     static var placement: OverlayPlacement {
         get { OverlayPlacement(rawValue: UserDefaults.standard.string(forKey: placementKey) ?? "") ?? .center }
@@ -44,5 +45,14 @@ enum AppSettings {
     static var gestureMode: GestureMode {
         get { GestureMode(rawValue: UserDefaults.standard.string(forKey: gestureKey) ?? "") ?? .both }
         set { UserDefaults.standard.set(newValue.rawValue, forKey: gestureKey) }
+    }
+
+    /// How long to hover the Clipboard slot before its side-panel opens.
+    static var clipboardHoverDelay: Double {
+        get {
+            let value = UserDefaults.standard.double(forKey: clipboardDelayKey)
+            return value == 0 ? 0.6 : value
+        }
+        set { UserDefaults.standard.set(newValue, forKey: clipboardDelayKey) }
     }
 }

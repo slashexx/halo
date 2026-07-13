@@ -5,7 +5,8 @@ import SwiftUI
 /// activating (run an action or add to an empty slot), editing, and clearing.
 @MainActor
 final class OverlayController {
-    private let panelSize = NSSize(width: 420, height: 420)
+    // Wide enough for the wheel plus the clipboard list beside it.
+    private let panelSize = NSSize(width: 1000, height: 560)
     private let model = RadialMenuModel()
     private let picker = AppPickerController()
 
@@ -60,7 +61,13 @@ final class OverlayController {
     }
 
     private func activateHighlightedOrHide() {
-        if let index = model.highlightedIndex {
+        if model.clipboardOpen {
+            if let clipIndex = model.highlightedClipIndex {
+                activateClip(clipIndex)
+            } else {
+                hide()
+            }
+        } else if let index = model.highlightedIndex {
             activate(index)
         } else {
             hide()
@@ -105,9 +112,10 @@ final class OverlayController {
         let root = RadialMenuView(
             model: model,
             onActivate: { [weak self] index in self?.activate(index) },
+            onActivateClip: { [weak self] index in self?.activateClip(index) },
             onEdit: { [weak self] index in self?.editSlot(index) },
             onClear: { [weak self] index in self?.model.setSlot(index, to: nil) },
-            onBack: { [weak self] in self?.model.popToRoot() },
+            onCloseClipboard: { [weak self] in self?.model.closeClipboard() },
             onDismiss: { [weak self] in self?.hide() }
         )
         let hosting = NSHostingView(rootView: root)
@@ -144,27 +152,25 @@ final class OverlayController {
 
     // MARK: - Slot interactions
 
-    /// Left-click / Return / release on a node.
+    /// Left-click / Return / release on a ring slot.
     private func activate(_ index: Int) {
-        guard let node = model.node(at: index) else { return }
-
-        switch node {
-        case .slot(let slotIndex, let item):
-            guard let item else { editSlot(slotIndex); return } // empty → add
-            if item.kind == .clipboard { model.enterClipboard(); return } // stay open
-            if let action = item.action {
-                hide()
-                // Execute once focus is back on the underlying app so keystroke /
-                // text injection lands there, not on our (now hidden) panel.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { action.execute() }
-            } else {
-                hide()
-            }
-
-        case .clip(let entry):
-            ClipboardMonitor.shared.makeCurrent(entry)
+        guard let item = model.item(at: index) else { editSlot(index); return } // empty → add
+        if item.kind == .clipboard { model.openClipboard(); return }            // stays open, on the side
+        if let action = item.action {
+            hide()
+            // Execute once focus is back on the underlying app so keystroke /
+            // text injection lands there, not on our (now hidden) panel.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { action.execute() }
+        } else {
             hide()
         }
+    }
+
+    /// Select a clipboard entry: make it the current clipboard and dismiss.
+    private func activateClip(_ index: Int) {
+        guard model.clipboardEntries.indices.contains(index) else { return }
+        ClipboardMonitor.shared.makeCurrent(model.clipboardEntries[index])
+        hide()
     }
 
     /// Open the app picker to fill or replace a slot.
@@ -200,9 +206,9 @@ final class OverlayController {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
             switch event.keyCode {
-            case 53: // Escape — leave the sub-menu first, then dismiss.
-                if self.model.level == .clipboard {
-                    self.model.popToRoot()
+            case 53: // Escape — close the clipboard side-panel first, then dismiss.
+                if self.model.clipboardOpen {
+                    self.model.closeClipboard()
                 } else {
                     self.hide()
                 }
