@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupStatusItem()
         setupHotkey()
+        ClipboardMonitor.shared.start() // begin remembering copies immediately
 
         // Debug hook: HALO_DEBUG_SHOW=1 summons the menu at screen center on
         // launch so it can be inspected without the hot key.
