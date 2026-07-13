@@ -4,6 +4,7 @@ import SwiftUI
 /// What the user chose in the picker.
 enum PickResult {
     case app(InstalledApp)
+    case clipboard
     case newWorkflow
 }
 
@@ -44,6 +45,22 @@ struct AppPickerView: View {
                         }
                     } icon: {
                         Image(systemName: "square.stack.3d.up.fill")
+                            .foregroundStyle(.tint)
+                    }
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    onPick(.clipboard)
+                } label: {
+                    Label {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("Clipboard").fontWeight(.semibold)
+                            Text("Recent copies as a sub-menu")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    } icon: {
+                        Image(systemName: "doc.on.clipboard.fill")
                             .foregroundStyle(.tint)
                     }
                 }

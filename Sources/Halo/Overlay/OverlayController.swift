@@ -107,6 +107,7 @@ final class OverlayController {
             onActivate: { [weak self] index in self?.activate(index) },
             onEdit: { [weak self] index in self?.editSlot(index) },
             onClear: { [weak self] index in self?.model.setSlot(index, to: nil) },
+            onBack: { [weak self] in self?.model.popToRoot() },
             onDismiss: { [weak self] in self?.hide() }
         )
         let hosting = NSHostingView(rootView: root)
@@ -143,20 +144,25 @@ final class OverlayController {
 
     // MARK: - Slot interactions
 
-    /// Left-click / Return on a slot: run the action, or open the picker if empty.
+    /// Left-click / Return / release on a node.
     private func activate(_ index: Int) {
-        guard model.slots.indices.contains(index) else { return }
+        guard let node = model.node(at: index) else { return }
 
-        if let action = model.slots[index]?.action {
-            hide()
-            // Execute after focus returns to the underlying app so keystroke /
-            // text injection lands there, not on our (now hidden) panel.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                action.execute()
+        switch node {
+        case .slot(let slotIndex, let item):
+            guard let item else { editSlot(slotIndex); return } // empty → add
+            if item.kind == .clipboard { model.enterClipboard(); return } // stay open
+            if let action = item.action {
+                hide()
+                // Execute once focus is back on the underlying app so keystroke /
+                // text injection lands there, not on our (now hidden) panel.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { action.execute() }
+            } else {
+                hide()
             }
-        } else if model.slots[index] == nil {
-            editSlot(index)
-        } else {
+
+        case .clip(let entry):
+            ClipboardMonitor.shared.makeCurrent(entry)
             hide()
         }
     }
@@ -174,6 +180,12 @@ final class OverlayController {
                     action: .launchApp(name: app.name)
                 )
                 self.model.setSlot(index, to: item)
+            case .clipboard:
+                self.model.setSlot(index, to: MenuItem(
+                    title: "Clipboard",
+                    icon: .symbol("doc.on.clipboard"),
+                    kind: .clipboard
+                ))
             case .newWorkflow:
                 HaloAction.runAppleScript(
                     #"display notification "Workflow builder is coming soon" with title "Halo""#
@@ -188,8 +200,12 @@ final class OverlayController {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
             switch event.keyCode {
-            case 53: // Escape
-                self.hide()
+            case 53: // Escape — leave the sub-menu first, then dismiss.
+                if self.model.level == .clipboard {
+                    self.model.popToRoot()
+                } else {
+                    self.hide()
+                }
                 return nil
             case 36, 76: // Return / Enter
                 if let index = self.model.highlightedIndex {
