@@ -1,22 +1,21 @@
 import Foundation
 
-/// A single slot in a radial menu. Phase 3 makes it `Codable` and lets a slot
-/// open a nested sub-menu instead of running an action.
-struct MenuItem: Identifiable, Hashable {
+/// A single slot in a radial menu. `Codable` so wheels persist and (later) ship
+/// as shareable presets. Phase 3+ lets a slot open a nested sub-menu.
+struct MenuItem: Identifiable, Codable, Hashable {
     let id: UUID
     var title: String
-    var systemImage: String
+    var icon: ItemIcon
     var action: HaloAction?
 
-    init(id: UUID = UUID(), title: String, systemImage: String, action: HaloAction? = nil) {
+    init(id: UUID = UUID(), title: String, icon: ItemIcon, action: HaloAction? = nil) {
         self.id = id
         self.title = title
-        self.systemImage = systemImage
+        self.icon = icon
         self.action = action
     }
 
-    // Identity-based equality/hashing so `HaloAction` needn't be Hashable and
-    // ForEach stays stable while an item's action is edited.
+    // Identity-based equality/hashing so ForEach stays stable as items are edited.
     static func == (lhs: MenuItem, rhs: MenuItem) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
