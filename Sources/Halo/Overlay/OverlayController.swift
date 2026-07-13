@@ -1,13 +1,13 @@
 import AppKit
 import SwiftUI
 
-/// Shows and hides the radial overlay, positions it at the cursor, and routes
-/// selection / dismissal. In Phase 1 activating an item just logs; Phase 2 will
-/// execute a real action.
+/// Shows/hides the radial overlay, positions it, and routes slot interactions:
+/// activating (run an action or add to an empty slot), editing, and clearing.
 @MainActor
 final class OverlayController {
     private let panelSize = NSSize(width: 420, height: 420)
     private let model = RadialMenuModel()
+    private let picker = AppPickerController()
 
     private var panel: OverlayPanel?
     private var keyMonitor: Any?
@@ -23,7 +23,6 @@ final class OverlayController {
     }
 
     /// Summons the menu centered on the active screen regardless of the setting.
-    /// Used by the debug launch hook.
     func showAtScreenCenter() {
         showPanel { [weak self] panel in self?.positionAtScreenCenter(panel) }
     }
@@ -55,7 +54,9 @@ final class OverlayController {
         let panel = OverlayPanel(size: panelSize)
         let root = RadialMenuView(
             model: model,
-            onSelect: { [weak self] item in self?.activate(item) },
+            onActivate: { [weak self] index in self?.activate(index) },
+            onEdit: { [weak self] index in self?.editSlot(index) },
+            onClear: { [weak self] index in self?.model.setSlot(index, to: nil) },
             onDismiss: { [weak self] in self?.hide() }
         )
         let hosting = NSHostingView(rootView: root)
@@ -79,8 +80,7 @@ final class OverlayController {
         panel.setFrameOrigin(origin)
     }
 
-    /// Centers the panel on whichever screen currently contains the cursor
-    /// (so it lands on the active display in a multi-monitor setup).
+    /// Centers the panel on whichever screen currently contains the cursor.
     private func positionAtScreenCenter(_ panel: OverlayPanel) {
         let mouse = NSEvent.mouseLocation
         let screen = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) }
@@ -91,13 +91,44 @@ final class OverlayController {
         panel.setFrameOrigin(origin)
     }
 
-    private func activate(_ item: MenuItem) {
+    // MARK: - Slot interactions
+
+    /// Left-click / Return on a slot: run the action, or open the picker if empty.
+    private func activate(_ index: Int) {
+        guard model.slots.indices.contains(index) else { return }
+
+        if let action = model.slots[index]?.action {
+            hide()
+            // Execute after focus returns to the underlying app so keystroke /
+            // text injection lands there, not on our (now hidden) panel.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                action.execute()
+            }
+        } else if model.slots[index] == nil {
+            editSlot(index)
+        } else {
+            hide()
+        }
+    }
+
+    /// Open the app picker to fill or replace a slot.
+    private func editSlot(_ index: Int) {
         hide()
-        guard let action = item.action else { return }
-        // Hide first, then execute on the next runloop turn so focus has fully
-        // returned to the underlying app before any keystroke/text injection.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            action.execute()
+        picker.present { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .app(let app):
+                let item = MenuItem(
+                    title: app.name,
+                    icon: .appIcon(path: app.path),
+                    action: .launchApp(name: app.name)
+                )
+                self.model.setSlot(index, to: item)
+            case .newWorkflow:
+                HaloAction.runAppleScript(
+                    #"display notification "Workflow builder is coming soon" with title "Halo""#
+                ).execute()
+            }
         }
     }
 
@@ -112,7 +143,7 @@ final class OverlayController {
                 return nil
             case 36, 76: // Return / Enter
                 if let index = self.model.highlightedIndex {
-                    self.activate(self.model.items[index])
+                    self.activate(index)
                 }
                 return nil
             default:
@@ -120,8 +151,10 @@ final class OverlayController {
             }
         }
 
+        // Dismiss on a click outside the panel. Left-only so right-clicks (which
+        // open a slot's context menu inside the panel) are never misread.
         globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(
-            matching: [.leftMouseDown, .rightMouseDown]
+            matching: [.leftMouseDown]
         ) { [weak self] _ in
             self?.hide()
         }

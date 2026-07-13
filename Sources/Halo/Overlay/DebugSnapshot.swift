@@ -17,7 +17,9 @@ enum DebugSnapshot {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            RadialMenuView(model: model, startVisible: true, onSelect: { _ in }, onDismiss: {})
+            RadialMenuView(model: model, startVisible: true,
+                           onActivate: { _ in }, onEdit: { _ in },
+                           onClear: { _ in }, onDismiss: {})
         }
         .frame(width: 420, height: 420)
 

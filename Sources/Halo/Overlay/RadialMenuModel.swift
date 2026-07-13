@@ -1,38 +1,51 @@
 import SwiftUI
 
-/// Observable state backing the radial overlay: the items to show and which one
-/// the cursor is currently pointing at.
+/// Observable state backing the radial overlay: a fixed set of slots (each
+/// either a `MenuItem` or empty) and which slot the cursor points at.
 @MainActor
 final class RadialMenuModel: ObservableObject {
-    @Published var items: [MenuItem]
+    static let slotCount = 8
+
+    @Published var slots: [MenuItem?]
     @Published var highlightedIndex: Int?
 
-    init(items: [MenuItem] = RadialMenuModel.demo) {
-        self.items = items
+    init(slots: [MenuItem?]? = nil) {
+        self.slots = slots ?? MenuStore.load() ?? RadialMenuModel.defaultSlots
     }
+
+    var slotCount: Int { slots.count }
 
     func reset() {
         highlightedIndex = nil
     }
 
-    /// Placeholder menu used until Phase 3 loads real, user-defined menus.
-    /// Each item now runs a real action so the engine can be exercised end-to-end.
-    static let demo: [MenuItem] = [
-        MenuItem(title: "Finder", systemImage: "folder",
-                 action: .launchApp(name: "Finder")),
-        MenuItem(title: "Halo repo", systemImage: "safari",
-                 action: .openURL("https://github.com/slashexx/halo")),
-        MenuItem(title: "Terminal", systemImage: "terminal",
-                 action: .launchApp(name: "Terminal")),
-        MenuItem(title: "Snippet", systemImage: "text.badge.plus",
-                 action: .insertText("Everything at your cursor. — Halo")),
-        MenuItem(title: "Screenshot", systemImage: "camera.viewfinder",
-                 action: .keyboardShortcut(KeyCombo(keyCode: 21, modifiers: [.maskCommand, .maskShift]))),
-        MenuItem(title: "Notify", systemImage: "bell",
-                 action: .runAppleScript(#"display notification "Hello from Halo" with title "Halo""#)),
-        MenuItem(title: "Music", systemImage: "music.note",
-                 action: .launchApp(name: "Music")),
-        MenuItem(title: "Log date", systemImage: "curlybraces",
-                 action: .runShell("date >> /tmp/halo-demo.log")),
-    ]
+    func setSlot(_ index: Int, to item: MenuItem?) {
+        guard slots.indices.contains(index) else { return }
+        slots[index] = item
+        MenuStore.save(slots)
+    }
+
+    // MARK: - Defaults
+
+    /// First-run wheel: a few useful items plus two empty "+" slots to invite
+    /// customization. Persisted the moment the user changes anything.
+    static var defaultSlots: [MenuItem?] {
+        var result: [MenuItem?] = [
+            MenuItem(title: "Finder", icon: .symbol("folder"),
+                     action: .launchApp(name: "Finder")),
+            MenuItem(title: "Halo repo", icon: .symbol("safari"),
+                     action: .openURL("https://github.com/slashexx/halo")),
+            MenuItem(title: "Terminal", icon: .symbol("terminal"),
+                     action: .launchApp(name: "Terminal")),
+            MenuItem(title: "Snippet", icon: .symbol("text.badge.plus"),
+                     action: .insertText("Everything at your cursor. — Halo")),
+            MenuItem(title: "Screenshot", icon: .symbol("camera.viewfinder"),
+                     action: .keyboardShortcut(KeyCombo(keyCode: 21,
+                                                        modifiers: [.maskCommand, .maskShift]))),
+            MenuItem(title: "Music", icon: .symbol("music.note"),
+                     action: .launchApp(name: "Music")),
+        ]
+        while result.count < slotCount { result.append(nil) }
+        return result
+    }
 }
