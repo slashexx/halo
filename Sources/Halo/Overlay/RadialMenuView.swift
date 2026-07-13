@@ -126,18 +126,25 @@ struct RadialMenuView: View {
 
     private var hub: some View {
         ZStack {
-            hubFront
-                .frame(width: hubSize, height: hubSize)
-                .glassEffect(.regular, in: .circle)
-                .opacity(model.hubFocused ? 0 : 1)
+            // Static glass disc — never transformed, so the Liquid Glass never
+            // re-rasterizes mid-animation (that was the flicker).
+            Circle().fill(.clear).glassEffect(.regular, in: .circle)
 
-            MediaPlayerFace(media: media, size: hubSize)
-                .opacity(model.hubFocused ? 1 : 0)
-                .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0)) // un-mirror
+            // Only the content (text ↔ album art) flips over the glass.
+            ZStack {
+                hubFront.opacity(model.hubFocused ? 0 : 1)
+
+                MediaPlayerFace(media: media, size: hubSize)
+                    .opacity(model.hubFocused ? 1 : 0)
+                    .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0)) // un-mirror
+            }
+            .rotation3DEffect(.degrees(model.hubFocused ? 180 : 0),
+                              axis: (x: 0, y: 1, z: 0), perspective: 0.5)
         }
-        .rotation3DEffect(.degrees(model.hubFocused ? 180 : 0), axis: (x: 0, y: 1, z: 0))
+        .frame(width: hubSize, height: hubSize)
+        .clipShape(.circle)
         .shadow(color: .black.opacity(0.18), radius: 12, y: 3)
-        .animation(.smooth(duration: 0.38), value: model.hubFocused)
+        .animation(.smooth(duration: 0.4), value: model.hubFocused)
     }
 
     @ViewBuilder
