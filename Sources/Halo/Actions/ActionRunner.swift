@@ -19,6 +19,19 @@ enum ActionRunner {
         case .runAppleScript(let source): runAppleScript(source)
         case .runShell(let command): runShell(command)
         case .insertText(let text): typeText(text)
+        case .chain(let steps): runChain(steps, from: 0)
+        }
+    }
+
+    /// Runs workflow steps in order, with a short gap between them so each step
+    /// (e.g. an app launch) has a moment to take effect before the next.
+    private static func runChain(_ steps: [HaloAction], from index: Int) {
+        guard index < steps.count else { return }
+        run(steps[index])
+        let next = index + 1
+        guard next < steps.count else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+            runChain(steps, from: next)
         }
     }
 

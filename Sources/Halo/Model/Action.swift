@@ -37,11 +37,13 @@ enum HaloAction: Equatable, Codable {
     case runAppleScript(String)           // execute AppleScript source
     case runShell(String)                 // run a shell command
     case insertText(String)               // type text into the focused field
+    indirect case chain([HaloAction])     // a workflow: run steps in sequence
 
     /// Whether executing requires Accessibility (keystroke / text injection).
     var needsAccessibility: Bool {
         switch self {
         case .keyboardShortcut, .insertText: return true
+        case .chain(let steps): return steps.contains { $0.needsAccessibility }
         default: return false
         }
     }
