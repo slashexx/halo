@@ -1,22 +1,48 @@
 import Foundation
 
 /// Where the radial menu appears when triggered.
-enum OverlayPlacement: String {
+enum OverlayPlacement: String, CaseIterable, Identifiable {
     case center // center of the screen under the cursor
     case cursor // at the cursor position
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .center: "Center of screen"
+        case .cursor: "At cursor"
+        }
+    }
 }
 
-/// Lightweight, UserDefaults-backed settings. Phase 3 folds this into the full
-/// persisted configuration; for now it just holds the overlay placement.
+/// How the user selects from the wheel.
+enum GestureMode: String, CaseIterable, Identifiable {
+    case both        // tap = sticky (click to pick); hold = release to pick
+    case holdRelease // hold ⌥Tab, navigate, release to pick
+    case pressToggle // press ⌥Tab to open, click / Return to pick
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .both: "Tap to open, or hold & release"
+        case .holdRelease: "Hold & release to pick"
+        case .pressToggle: "Press to open, click to pick"
+        }
+    }
+}
+
+/// Lightweight, UserDefaults-backed settings.
 @MainActor
 enum AppSettings {
     private static let placementKey = "overlayPlacement"
+    private static let gestureKey = "gestureMode"
 
     static var placement: OverlayPlacement {
-        get {
-            let raw = UserDefaults.standard.string(forKey: placementKey) ?? ""
-            return OverlayPlacement(rawValue: raw) ?? .center
-        }
+        get { OverlayPlacement(rawValue: UserDefaults.standard.string(forKey: placementKey) ?? "") ?? .center }
         set { UserDefaults.standard.set(newValue.rawValue, forKey: placementKey) }
+    }
+
+    static var gestureMode: GestureMode {
+        get { GestureMode(rawValue: UserDefaults.standard.string(forKey: gestureKey) ?? "") ?? .both }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: gestureKey) }
     }
 }

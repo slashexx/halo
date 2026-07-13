@@ -14,8 +14,57 @@ final class OverlayController {
     private var globalMouseMonitor: Any?
     private(set) var isVisible = false
 
+    // Gesture state for hold-and-release / tap-to-stick.
+    private var pressUptime: TimeInterval = 0
+    private var awaitingClick = false
+    private let tapThreshold: TimeInterval = 0.3
+
     func toggle() {
         isVisible ? hide() : show()
+    }
+
+    // MARK: - Trigger (from the ⌥Tab hot key)
+
+    func handlePress() {
+        switch AppSettings.gestureMode {
+        case .pressToggle:
+            toggle()
+        case .holdRelease:
+            if !isVisible { pressUptime = ProcessInfo.processInfo.systemUptime; show() }
+        case .both:
+            if isVisible {
+                hide() // a second press closes a sticky wheel
+            } else {
+                pressUptime = ProcessInfo.processInfo.systemUptime
+                awaitingClick = false
+                show()
+            }
+        }
+    }
+
+    func handleRelease() {
+        switch AppSettings.gestureMode {
+        case .pressToggle:
+            break
+        case .holdRelease:
+            if isVisible { activateHighlightedOrHide() }
+        case .both:
+            guard isVisible, !awaitingClick else { return }
+            let held = ProcessInfo.processInfo.systemUptime - pressUptime
+            if held < tapThreshold {
+                awaitingClick = true // quick tap → sticky, wait for a click
+            } else {
+                activateHighlightedOrHide()
+            }
+        }
+    }
+
+    private func activateHighlightedOrHide() {
+        if let index = model.highlightedIndex {
+            activate(index)
+        } else {
+            hide()
+        }
     }
 
     func show() {
@@ -45,6 +94,7 @@ final class OverlayController {
         guard isVisible else { return }
         panel?.orderOut(nil)
         isVisible = false
+        awaitingClick = false
         removeMonitors()
     }
 
