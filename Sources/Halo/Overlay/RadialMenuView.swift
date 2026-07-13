@@ -18,7 +18,7 @@ struct RadialMenuView: View {
 
     @State private var appeared: Bool
 
-    private let hubSize: CGFloat = 96
+    private let hubSize: CGFloat = 160   // large enough for the media player
     private var hubRadius: CGFloat { hubSize / 2 }
 
     init(
@@ -45,10 +45,11 @@ struct RadialMenuView: View {
         self._appeared = State(initialValue: startVisible)
     }
 
-    // Tighter layout than before; clipboard ring is a touch wider with smaller
-    // circles since it can hold up to 10 numbered items.
-    private var ringRadius: CGFloat { model.level == .clipboard ? 120 : 104 }
-    private var itemSize: CGFloat { model.level == .clipboard ? 48 : 62 }
+    // Ring pulled in to just clear the 160pt hub, with slightly larger circles,
+    // so items sit close together (packed) without shrinking. Clipboard ring is
+    // a touch wider to fit up to 10 numbered items.
+    private var ringRadius: CGFloat { model.level == .clipboard ? 150 : 126 }
+    private var itemSize: CGFloat { model.level == .clipboard ? 52 : 66 }
 
     var body: some View {
         GeometryReader { geo in
