@@ -1,53 +1,56 @@
 import SwiftUI
 
-/// Observable state backing the overlay: the slots (the ring), whether the
-/// clipboard side-panel is open, and the two independent highlights (ring slot
-/// vs. clipboard row).
+/// Observable state backing the overlay. Two navigation levels: the root ring
+/// of slots, and a nested clipboard ring. At root the center hub flips to the
+/// media player; inside the clipboard ring the center acts as "‹ Back".
 @MainActor
 final class RadialMenuModel: ObservableObject {
     static let slotCount = 8
 
-    @Published var slots: [MenuItem?]
-    @Published var clipboardOpen = false
-    @Published var hubFocused = false           // cursor is over the center hub
-    @Published var highlightedIndex: Int?       // ring slot under the cursor
-    @Published var highlightedClipIndex: Int?   // clipboard row under the cursor
+    enum Level: Equatable { case root, clipboard }
 
-    /// Snapshot taken when the panel opens, so the list is stable while browsed.
+    @Published var slots: [MenuItem?]
+    @Published var level: Level = .root
+    @Published var hubFocused = false        // cursor over the center hub (root → media flip)
+    @Published var highlightedIndex: Int?    // index into the current level's nodes
+
     private(set) var clipboardEntries: [ClipboardEntry] = []
 
     init(slots: [MenuItem?]? = nil) {
         self.slots = slots ?? MenuStore.load() ?? RadialMenuModel.defaultSlots
     }
 
-    var slotCountValue: Int { slots.count }
+    /// Number of nodes shown on the ring at the current level.
+    var nodeCount: Int {
+        level == .root ? slots.count : clipboardEntries.count
+    }
 
     func item(at index: Int) -> MenuItem? {
         slots.indices.contains(index) ? slots[index] : nil
     }
 
     func isClipboardSlot(_ index: Int) -> Bool {
-        item(at: index)?.kind == .clipboard
+        level == .root && item(at: index)?.kind == .clipboard
     }
 
     // MARK: - Navigation
 
     func reset() {
-        clipboardOpen = false
+        level = .root
         hubFocused = false
         highlightedIndex = nil
-        highlightedClipIndex = nil
     }
 
     func openClipboard() {
         clipboardEntries = Array(ClipboardMonitor.shared.entries.prefix(ClipboardMonitor.shared.maxEntries))
-        clipboardOpen = true
-        highlightedClipIndex = nil
+        level = .clipboard
+        hubFocused = false
+        highlightedIndex = nil
     }
 
-    func closeClipboard() {
-        clipboardOpen = false
-        highlightedClipIndex = nil
+    func back() {
+        level = .root
+        highlightedIndex = nil
     }
 
     // MARK: - Mutation

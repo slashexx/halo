@@ -67,14 +67,10 @@ final class OverlayController {
     }
 
     private func activateHighlightedOrHide() {
-        if model.clipboardOpen {
-            if let clipIndex = model.highlightedClipIndex {
-                activateClip(clipIndex)
-            } else {
-                hide()
-            }
-        } else if let index = model.highlightedIndex {
+        if let index = model.highlightedIndex {
             activate(index)
+        } else if model.level == .clipboard {
+            model.back() // released in the center while browsing clips → go up
         } else {
             hide()
         }
@@ -119,12 +115,11 @@ final class OverlayController {
             model: model,
             media: media,
             onActivate: { [weak self] index in self?.activate(index) },
-            onActivateClip: { [weak self] index in self?.activateClip(index) },
             onEdit: { [weak self] index in self?.editSlot(index) },
             onEditWorkflow: { [weak self] index in self?.editWorkflow(index) },
             onRename: { [weak self] index in self?.renameSlot(index) },
             onClear: { [weak self] index in self?.model.setSlot(index, to: nil) },
-            onCloseClipboard: { [weak self] in self?.model.closeClipboard() },
+            onBack: { [weak self] in self?.model.back() },
             onDismiss: { [weak self] in self?.hide() }
         )
         let hosting = NSHostingView(rootView: root)
@@ -161,10 +156,18 @@ final class OverlayController {
 
     // MARK: - Slot interactions
 
-    /// Left-click / Return / release on a ring slot.
+    /// Left-click / Return / release on a node — a clip (clipboard level) or a
+    /// slot (root level).
     private func activate(_ index: Int) {
+        if model.level == .clipboard {
+            guard model.clipboardEntries.indices.contains(index) else { return }
+            ClipboardMonitor.shared.makeCurrent(model.clipboardEntries[index])
+            hide()
+            return
+        }
+
         guard let item = model.item(at: index) else { editSlot(index); return } // empty → add
-        if item.kind == .clipboard { model.openClipboard(); return }            // stays open, on the side
+        if item.kind == .clipboard { model.openClipboard(); return }             // nested ring
         if let action = item.action {
             hide()
             // Execute once focus is back on the underlying app so keystroke /
@@ -173,13 +176,6 @@ final class OverlayController {
         } else {
             hide()
         }
-    }
-
-    /// Select a clipboard entry: make it the current clipboard and dismiss.
-    private func activateClip(_ index: Int) {
-        guard model.clipboardEntries.indices.contains(index) else { return }
-        ClipboardMonitor.shared.makeCurrent(model.clipboardEntries[index])
-        hide()
     }
 
     /// Quick one-field rename for any filled slot.
@@ -287,9 +283,9 @@ final class OverlayController {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
             switch event.keyCode {
-            case 53: // Escape — close the clipboard side-panel first, then dismiss.
-                if self.model.clipboardOpen {
-                    self.model.closeClipboard()
+            case 53: // Escape — leave the clipboard ring first, then dismiss.
+                if self.model.level == .clipboard {
+                    self.model.back()
                 } else {
                     self.hide()
                 }

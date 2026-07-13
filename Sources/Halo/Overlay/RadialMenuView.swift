@@ -1,67 +1,89 @@
 import AppKit
 import SwiftUI
 
-/// The radial menu: a ring of slots around a hub. The Clipboard slot opens a
-/// list that slides in *beside* the wheel (the wheel stays visible). A filled
-/// slot runs an action; an empty slot shows ＋ to add.
+/// The radial menu. Root level: a ring of slots with a center hub that flips to
+/// the media player. Clipboard level: a nested ring of numbered recent copies
+/// with the center acting as "‹ Back".
 struct RadialMenuView: View {
     @ObservedObject var model: RadialMenuModel
     @ObservedObject var media: MediaHubModel
 
-    var onActivate: (Int) -> Void        // ring slot
-    var onActivateClip: (Int) -> Void    // clipboard row
-    var onEdit: (Int) -> Void            // set or replace a slot
-    var onEditWorkflow: (Int) -> Void    // edit a workflow slot
-    var onRename: (Int) -> Void          // rename a slot
-    var onClear: (Int) -> Void           // empty a slot
-    var onCloseClipboard: () -> Void
+    var onActivate: (Int) -> Void   // slot (root) or clip (clipboard), by level
+    var onEdit: (Int) -> Void
+    var onEditWorkflow: (Int) -> Void
+    var onRename: (Int) -> Void
+    var onClear: (Int) -> Void
+    var onBack: () -> Void
     var onDismiss: () -> Void
 
     @State private var appeared: Bool
 
-    private let ringRadius: CGFloat = 132
-    private let itemSize: CGFloat = 60
-    private let hubSize: CGFloat = 160
+    private let hubSize: CGFloat = 96
     private var hubRadius: CGFloat { hubSize / 2 }
-    private let listOffsetX: CGFloat = 320
 
     init(
         model: RadialMenuModel,
         media: MediaHubModel = MediaHubModel(),
         startVisible: Bool = false,
         onActivate: @escaping (Int) -> Void,
-        onActivateClip: @escaping (Int) -> Void = { _ in },
-        onEdit: @escaping (Int) -> Void,
+        onEdit: @escaping (Int) -> Void = { _ in },
         onEditWorkflow: @escaping (Int) -> Void = { _ in },
         onRename: @escaping (Int) -> Void = { _ in },
-        onClear: @escaping (Int) -> Void,
-        onCloseClipboard: @escaping () -> Void = {},
-        onDismiss: @escaping () -> Void
+        onClear: @escaping (Int) -> Void = { _ in },
+        onBack: @escaping () -> Void = {},
+        onDismiss: @escaping () -> Void = {}
     ) {
         self._model = ObservedObject(wrappedValue: model)
         self._media = ObservedObject(wrappedValue: media)
         self.onActivate = onActivate
-        self.onActivateClip = onActivateClip
         self.onEdit = onEdit
         self.onEditWorkflow = onEditWorkflow
         self.onRename = onRename
         self.onClear = onClear
-        self.onCloseClipboard = onCloseClipboard
+        self.onBack = onBack
         self.onDismiss = onDismiss
         self._appeared = State(initialValue: startVisible)
     }
 
+    // Tighter layout than before; clipboard ring is a touch wider with smaller
+    // circles since it can hold up to 10 numbered items.
+    private var ringRadius: CGFloat { model.level == .clipboard ? 120 : 104 }
+    private var itemSize: CGFloat { model.level == .clipboard ? 48 : 62 }
+
     var body: some View {
         GeometryReader { geo in
             let center = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
+            let count = model.nodeCount
 
             ZStack {
-                ring(center: center)
+                hub.position(center)
 
-                if model.clipboardOpen {
-                    ClipboardListView(model: model, onActivate: onActivateClip, onBack: onCloseClipboard)
-                        .position(x: center.x + listOffsetX, y: center.y)
-                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                ForEach(0..<count, id: \.self) { index in
+                    nodeView(index: index, isHighlighted: model.highlightedIndex == index)
+                        .position(position(for: index, count: count, center: center))
+                }
+            }
+            .contentShape(Rectangle())
+            .onContinuousHover { phase in
+                if case .active(let location) = phase {
+                    updateHighlight(at: location, center: center, count: count)
+                }
+            }
+            .onTapGesture { handleTap() }
+            .task(id: dwellKey) {
+                guard model.level == .root, let index = model.highlightedIndex,
+                      model.isClipboardSlot(index) else { return }
+                try? await Task.sleep(for: .seconds(AppSettings.clipboardHoverDelay))
+                if model.highlightedIndex == index, model.level == .root {
+                    model.openClipboard()
+                }
+            }
+            .task(id: model.hubFocused) {
+                guard model.hubFocused else { return }
+                media.refresh()
+                while !Task.isCancelled && model.hubFocused {
+                    try? await Task.sleep(for: .seconds(1.2))
+                    if model.hubFocused { media.refresh() }
                 }
             }
         }
@@ -69,114 +91,97 @@ struct RadialMenuView: View {
         .opacity(appeared ? 1 : 0)
         .animation(.smooth(duration: 0.24), value: appeared)
         .animation(.smooth(duration: 0.18), value: model.highlightedIndex)
-        .animation(.smooth(duration: 0.24), value: model.clipboardOpen)
+        .animation(.smooth(duration: 0.28), value: model.level)
+        .animation(.smooth(duration: 0.38), value: model.hubFocused)
         .onAppear { appeared = true }
     }
 
-    private func ring(center: CGPoint) -> some View {
-        ZStack {
-            hub.position(center)
+    private var dwellKey: String { "\(model.level == .root ? "r" : "c")-\(model.highlightedIndex ?? -1)" }
 
-            ForEach(0..<model.slotCountValue, id: \.self) { index in
-                slotView(index: index, isHighlighted: model.highlightedIndex == index)
-                    .position(position(for: index, count: model.slotCountValue, center: center))
-            }
+    private func handleTap() {
+        if model.level == .clipboard {
+            if let index = model.highlightedIndex { onActivate(index) } else { onBack() }
+        } else if model.hubFocused {
+            // Center flipped to the media player — its own buttons handle taps.
+        } else if let index = model.highlightedIndex {
+            onActivate(index)
+        } else {
+            onDismiss()
         }
-        .contentShape(Rectangle())
-        .onContinuousHover { phase in
-            guard !model.clipboardOpen else { return } // frozen while the list is open
-            if case .active(let location) = phase {
-                updateHighlight(at: location, center: center, count: model.slotCountValue)
-            }
-        }
-        .onTapGesture {
-            if model.clipboardOpen {
-                onCloseClipboard()
-            } else if model.hubFocused {
-                // Taps on the hub are handled by the player's own controls.
-            } else if let index = model.highlightedIndex {
-                onActivate(index)
-            } else {
-                onDismiss()
-            }
-        }
-        // Dwell on the Clipboard slot opens its side-panel. Delay is configurable
-        // so a quick pass (e.g. to right-click → Remove) doesn't trigger it.
-        .task(id: dwellKey) {
-            guard !model.clipboardOpen, let index = model.highlightedIndex,
-                  model.isClipboardSlot(index) else { return }
-            try? await Task.sleep(for: .seconds(AppSettings.clipboardHoverDelay))
-            if model.highlightedIndex == index, !model.clipboardOpen {
-                model.openClipboard()
-            }
-        }
-        // Keep the media hub fresh while the cursor is on it.
-        .task(id: model.hubFocused) {
-            guard model.hubFocused else { return }
-            media.refresh()
-            while !Task.isCancelled && model.hubFocused {
-                try? await Task.sleep(for: .seconds(1.2))
-                if model.hubFocused { media.refresh() }
-            }
-        }
-    }
-
-    private var dwellKey: String {
-        "\(model.clipboardOpen ? "c" : "r")-\(model.highlightedIndex ?? -1)"
     }
 
     // MARK: - Hub
 
     private var hub: some View {
         ZStack {
-            // Static glass disc — never transformed, so the Liquid Glass never
-            // re-rasterizes mid-animation (that was the flicker).
             Circle().fill(.clear).glassEffect(.regular, in: .circle)
 
-            // Only the content (text ↔ album art) flips over the glass.
-            ZStack {
-                hubFront.opacity(model.hubFocused ? 0 : 1)
-
-                MediaPlayerFace(media: media, size: hubSize)
-                    .opacity(model.hubFocused ? 1 : 0)
-                    .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0)) // un-mirror
+            if model.level == .clipboard {
+                clipboardHub
+            } else {
+                ZStack {
+                    rootHubFront.opacity(model.hubFocused ? 0 : 1)
+                    MediaPlayerFace(media: media, size: hubSize)
+                        .opacity(model.hubFocused ? 1 : 0)
+                        .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+                }
+                .rotation3DEffect(.degrees(model.hubFocused ? 180 : 0),
+                                  axis: (x: 0, y: 1, z: 0), perspective: 0.5)
             }
-            .rotation3DEffect(.degrees(model.hubFocused ? 180 : 0),
-                              axis: (x: 0, y: 1, z: 0), perspective: 0.5)
         }
         .frame(width: hubSize, height: hubSize)
         .clipShape(.circle)
         .shadow(color: .black.opacity(0.18), radius: 12, y: 3)
-        .animation(.smooth(duration: 0.4), value: model.hubFocused)
     }
 
     @ViewBuilder
-    private var hubFront: some View {
+    private var rootHubFront: some View {
         if let index = model.highlightedIndex, let item = model.item(at: index) {
             Text(item.title).modifier(HubLabel())
-        } else if model.highlightedIndex != nil {
-            VStack(spacing: 2) {
-                Image(systemName: "plus.circle.fill").font(.system(size: 22, weight: .semibold))
-                Text("Add").font(.system(size: 13, weight: .medium))
-            }
-            .foregroundStyle(.primary)
         } else {
             VStack(spacing: 4) {
-                Image(systemName: "play.circle").font(.system(size: 26, weight: .medium))
-                Text("Media").font(.system(size: 12, weight: .medium)).foregroundStyle(.secondary)
+                Image(systemName: "play.circle").font(.system(size: 24, weight: .medium))
+                Text("Media").font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
             }
             .foregroundStyle(.primary)
         }
     }
 
-    // MARK: - Slot views
+    @ViewBuilder
+    private var clipboardHub: some View {
+        if let index = model.highlightedIndex, model.clipboardEntries.indices.contains(index) {
+            VStack(spacing: 2) {
+                Text("\(index + 1)").font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(.tint)
+                Text(model.clipboardEntries[index].summary).modifier(HubLabel())
+            }
+        } else {
+            VStack(spacing: 3) {
+                Image(systemName: "chevron.backward").font(.system(size: 16, weight: .semibold))
+                Text("Back").font(.system(size: 12, weight: .medium))
+            }
+            .foregroundStyle(.primary)
+        }
+    }
+
+    // MARK: - Nodes
 
     @ViewBuilder
-    private func slotView(index: Int, isHighlighted: Bool) -> some View {
+    private func nodeView(index: Int, isHighlighted: Bool) -> some View {
+        if model.level == .clipboard {
+            clipNode(index: index, isHighlighted: isHighlighted)
+        } else {
+            slotNode(index: index, isHighlighted: isHighlighted)
+        }
+    }
+
+    @ViewBuilder
+    private func slotNode(index: Int, isHighlighted: Bool) -> some View {
         if let item = model.item(at: index) {
             iconView(item.icon)
                 .frame(width: itemSize, height: itemSize)
                 .glassEffect(.regular, in: .circle)
+                .overlay(rim(isHighlighted))
                 .modifier(RingItem(isHighlighted: isHighlighted))
                 .contextMenu {
                     if item.kind == .action, case .chain? = item.action {
@@ -192,13 +197,31 @@ struct RadialMenuView: View {
                 .foregroundStyle(.secondary)
                 .frame(width: itemSize, height: itemSize)
                 .glassEffect(.regular, in: .circle)
-                .overlay(
-                    Circle().strokeBorder(style: StrokeStyle(lineWidth: 1.2, dash: [4, 4]))
-                        .foregroundStyle(.white.opacity(isHighlighted ? 0.45 : 0.18))
-                )
+                .overlay(Circle().strokeBorder(style: StrokeStyle(lineWidth: 1.2, dash: [4, 4]))
+                    .foregroundStyle(.white.opacity(isHighlighted ? 0.45 : 0.18)))
                 .modifier(RingItem(isHighlighted: isHighlighted))
                 .contextMenu { Button("Add…") { onEdit(index) } }
         }
+    }
+
+    private func clipNode(index: Int, isHighlighted: Bool) -> some View {
+        ClipThumbnailView(entry: model.clipboardEntries[index], size: itemSize)
+            .overlay(rim(isHighlighted))
+            .overlay(alignment: .topLeading) {
+                Text("\(index + 1)")
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .frame(width: 17, height: 17)
+                    .background(index == 0 ? AnyShapeStyle(.tint) : AnyShapeStyle(.black.opacity(0.6)),
+                                in: .circle)
+                    .offset(x: -3, y: -3)
+            }
+            .modifier(RingItem(isHighlighted: isHighlighted))
+    }
+
+    private func rim(_ isHighlighted: Bool) -> some View {
+        Circle().strokeBorder(.white.opacity(isHighlighted ? 0.55 : 0.10),
+                              lineWidth: isHighlighted ? 1.5 : 0.75)
     }
 
     @ViewBuilder
@@ -233,20 +256,16 @@ struct RadialMenuView: View {
         let dy = location.y - center.y
         let distance = hypot(dx, dy)
 
-        // Inside the hub circle → focus the media player, no ring selection.
         if distance <= hubRadius {
-            if !model.hubFocused { model.hubFocused = true }
+            // Center: root → flip to media; clipboard → back zone.
+            let focus = model.level == .root
+            if model.hubFocused != focus { model.hubFocused = focus }
             if model.highlightedIndex != nil { model.highlightedIndex = nil }
             return
         }
         if model.hubFocused { model.hubFocused = false }
 
         guard count > 0 else { model.highlightedIndex = nil; return }
-        guard distance > hubRadius else {
-            if model.highlightedIndex != nil { model.highlightedIndex = nil }
-            return
-        }
-
         let cursorAngle = atan2(dy, dx) * 180.0 / .pi
         var best = 0
         var bestDiff = Double.infinity
@@ -265,7 +284,7 @@ struct RadialMenuView: View {
     }
 }
 
-// MARK: - Shared modifiers / helpers
+// MARK: - Shared modifiers
 
 private struct RingItem: ViewModifier {
     let isHighlighted: Bool
@@ -281,11 +300,11 @@ private struct RingItem: ViewModifier {
 private struct HubLabel: ViewModifier {
     func body(content: Content) -> some View {
         content
-            .font(.system(size: 15, weight: .semibold, design: .rounded))
+            .font(.system(size: 14, weight: .semibold, design: .rounded))
             .multilineTextAlignment(.center)
             .lineLimit(2)
             .minimumScaleFactor(0.7)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 10)
             .foregroundStyle(.primary)
     }
 }
