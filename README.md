@@ -55,19 +55,6 @@ Requires macOS 26+ and a Swift 6 toolchain (Xcode **or** Command Line Tools).
 - **Automation** — asked per-app the first time Halo scripts Spotify, Music, or a
   browser.
 
-## Roadmap
-
-- [x] Glass radial overlay + ⌥Tab trigger
-- [x] Action engine (launch, URL, shortcut, script, text)
-- [x] Customizable, persisted wheel + app picker
-- [x] Clipboard history
-- [x] Workflows (chained actions) + editor
-- [x] Media player hub
-- [x] Onboarding + permissions, app icon, launch-at-login
-- [ ] Context-aware per-app menus
-- [ ] Preset import/export + community
-- [ ] Notarized release + auto-update
-
 ## License
 
 MIT — see [LICENSE](LICENSE).

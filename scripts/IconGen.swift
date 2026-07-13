@@ -1,6 +1,7 @@
 import AppKit
 
-// Draws the Halo app icon (a glassy ring of dots around a center) to a PNG.
+// Draws the Halo app icon: a luminous ring (a halo) with one brilliant point of
+// light on it — the solar-eclipse "diamond ring" — on a deep dark sky.
 // Usage: swift scripts/IconGen.swift <output.png>
 
 let size = 1024.0
@@ -12,56 +13,84 @@ let margin = 92.0
 let content = size - 2 * margin
 let rect = CGRect(x: margin, y: margin, width: content, height: content)
 let corner = content * 0.235
+let center = CGPoint(x: size / 2, y: size / 2)
 
-// Rounded-square mask
+// Squircle mask
 ctx.addPath(CGPath(roundedRect: rect, cornerWidth: corner, cornerHeight: corner, transform: nil))
 ctx.clip()
 
-// Diagonal gradient background
+// Deep-space background: indigo core fading to near-black.
 let bg = CGGradient(
     colorsSpace: CGColorSpaceCreateDeviceRGB(),
     colors: [
-        NSColor(srgbRed: 0.35, green: 0.29, blue: 1.00, alpha: 1).cgColor,
-        NSColor(srgbRed: 0.72, green: 0.28, blue: 1.00, alpha: 1).cgColor,
+        NSColor(srgbRed: 0.16, green: 0.13, blue: 0.34, alpha: 1).cgColor,
+        NSColor(srgbRed: 0.05, green: 0.04, blue: 0.09, alpha: 1).cgColor,
     ] as CFArray,
     locations: [0, 1]
 )!
-ctx.drawLinearGradient(bg, start: CGPoint(x: rect.minX, y: rect.maxY),
-                       end: CGPoint(x: rect.maxX, y: rect.minY), options: [])
+ctx.drawRadialGradient(bg, startCenter: center, startRadius: 0,
+                       endCenter: center, endRadius: content * 0.72, options: [.drawsAfterEndLocation])
 
-// Soft top highlight
-let glow = CGGradient(
+// All light is additive so overlaps bloom.
+ctx.setBlendMode(.plusLighter)
+
+let ringRadius = content * 0.30
+let ringRect = CGRect(x: center.x - ringRadius, y: center.y - ringRadius,
+                      width: ringRadius * 2, height: ringRadius * 2)
+
+// Glowing ring: wide-faint → narrow-bright passes build a soft bloom.
+let ringPasses: [(CGFloat, CGFloat)] = [
+    (content * 0.065, 0.10),
+    (content * 0.038, 0.18),
+    (content * 0.020, 0.45),
+    (content * 0.009, 0.95),
+]
+for (width, alpha) in ringPasses {
+    ctx.setStrokeColor(NSColor(srgbRed: 0.85, green: 0.88, blue: 1.0, alpha: alpha).cgColor)
+    ctx.setLineWidth(width)
+    ctx.strokeEllipse(in: ringRect)
+}
+
+// The diamond: one brilliant point of light on the ring (upper-right).
+let angle = 52.0 * .pi / 180.0
+let diamond = CGPoint(x: center.x + cos(angle) * ringRadius,
+                      y: center.y + sin(angle) * ringRadius)
+
+// Bloom halo around the point.
+let bloom = CGGradient(
     colorsSpace: CGColorSpaceCreateDeviceRGB(),
-    colors: [NSColor.white.withAlphaComponent(0.28).cgColor,
+    colors: [NSColor.white.withAlphaComponent(0.95).cgColor,
              NSColor.white.withAlphaComponent(0).cgColor] as CFArray,
     locations: [0, 1]
 )!
-ctx.drawRadialGradient(glow, startCenter: CGPoint(x: size / 2, y: size * 0.72), startRadius: 0,
-                       endCenter: CGPoint(x: size / 2, y: size * 0.72), endRadius: content * 0.6,
-                       options: [])
+ctx.drawRadialGradient(bloom, startCenter: diamond, startRadius: 0,
+                       endCenter: diamond, endRadius: content * 0.17, options: [])
 
-let center = CGPoint(x: size / 2, y: size / 2)
-let ringRadius = content * 0.30
-let dot = content * 0.072
-
-// Faint connecting ring
-ctx.setStrokeColor(NSColor.white.withAlphaComponent(0.16).cgColor)
-ctx.setLineWidth(content * 0.012)
-ctx.strokeEllipse(in: CGRect(x: center.x - ringRadius, y: center.y - ringRadius,
-                             width: ringRadius * 2, height: ringRadius * 2))
-
-// Ring of dots (top one accented)
-for i in 0..<8 {
-    let angle = Double(i) / 8.0 * 2 * .pi - .pi / 2
-    let p = CGPoint(x: center.x + cos(angle) * ringRadius, y: center.y + sin(angle) * ringRadius)
-    ctx.setFillColor(NSColor.white.withAlphaComponent(i == 0 ? 1.0 : 0.55).cgColor)
-    ctx.fillEllipse(in: CGRect(x: p.x - dot, y: p.y - dot, width: dot * 2, height: dot * 2))
+// Four-point sparkle spikes.
+func spike(dx: CGFloat, dy: CGFloat, length: CGFloat, half: CGFloat) {
+    let tip = CGPoint(x: diamond.x + dx * length, y: diamond.y + dy * length)
+    // perpendicular for the base width
+    let px = -dy, py = dx
+    let p = CGMutablePath()
+    p.move(to: CGPoint(x: diamond.x + px * half, y: diamond.y + py * half))
+    p.addLine(to: tip)
+    p.addLine(to: CGPoint(x: diamond.x - px * half, y: diamond.y - py * half))
+    p.closeSubpath()
+    ctx.addPath(p)
+    ctx.setFillColor(NSColor.white.withAlphaComponent(0.8).cgColor)
+    ctx.fillPath()
 }
+let spikeLen = content * 0.28
+let spikeHalf = content * 0.016
+spike(dx: 1, dy: 0, length: spikeLen, half: spikeHalf)
+spike(dx: -1, dy: 0, length: spikeLen, half: spikeHalf)
+spike(dx: 0, dy: 1, length: spikeLen, half: spikeHalf)
+spike(dx: 0, dy: -1, length: spikeLen, half: spikeHalf)
 
-// Center hub
-let hub = content * 0.135
-ctx.setFillColor(NSColor.white.withAlphaComponent(0.96).cgColor)
-ctx.fillEllipse(in: CGRect(x: center.x - hub, y: center.y - hub, width: hub * 2, height: hub * 2))
+// Bright core.
+let core = content * 0.030
+ctx.setFillColor(NSColor.white.cgColor)
+ctx.fillEllipse(in: CGRect(x: diamond.x - core, y: diamond.y - core, width: core * 2, height: core * 2))
 
 image.unlockFocus()
 
