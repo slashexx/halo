@@ -1,11 +1,11 @@
 import AppKit
 import SwiftUI
 
-/// Presents the app picker in a small floating panel. Unlike the overlay, this
-/// activates the app so the search field can receive typing.
+/// Presents the app picker in a floating window. Switches to a regular
+/// activation policy while open so the search field accepts typing.
 @MainActor
-final class AppPickerController {
-    private var panel: NSPanel?
+final class AppPickerController: NSObject, NSWindowDelegate {
+    private var window: NSWindow?
 
     func present(onPick: @escaping (PickResult) -> Void) {
         close()
@@ -20,25 +20,29 @@ final class AppPickerController {
             onCancel: { [weak self] in self?.close() }
         )
 
-        let panel = NSPanel(
+        let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 340, height: 460),
-            styleMask: [.titled, .closable, .utilityWindow, .fullSizeContentView],
+            styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
-        panel.title = "Add to Wheel"
-        panel.titlebarAppearsTransparent = true
-        panel.isFloatingPanel = true
-        panel.contentView = NSHostingView(rootView: view)
-        panel.center()
+        window.title = "Add to Wheel"
+        window.contentView = NSHostingView(rootView: view)
+        window.isReleasedWhenClosed = false
+        window.delegate = self
+        window.center()
 
-        self.panel = panel
-        NSApp.activate(ignoringOtherApps: true)
-        panel.makeKeyAndOrderFront(nil)
+        self.window = window
+        AppActivation.begin()
+        window.makeKeyAndOrderFront(nil)
     }
 
     func close() {
-        panel?.orderOut(nil)
-        panel = nil
+        window?.close()
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        window = nil
+        AppActivation.end()
     }
 }

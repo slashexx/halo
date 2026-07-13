@@ -1,10 +1,10 @@
 import AppKit
 import SwiftUI
 
-/// Presents the workflow editor in a floating window (activates so text fields
-/// and the shortcut recorder receive input).
+/// Presents the workflow editor in a floating window. Switches the app to a
+/// regular activation policy while open so text fields accept typing.
 @MainActor
-final class WorkflowEditorController {
+final class WorkflowEditorController: NSObject, NSWindowDelegate {
     private var window: NSWindow?
 
     func present(
@@ -33,15 +33,20 @@ final class WorkflowEditorController {
         window.title = "Workflow"
         window.contentView = NSHostingView(rootView: view)
         window.isReleasedWhenClosed = false
+        window.delegate = self
         window.center()
 
         self.window = window
-        NSApp.activate(ignoringOtherApps: true)
+        AppActivation.begin()
         window.makeKeyAndOrderFront(nil)
     }
 
     func close() {
-        window?.orderOut(nil)
+        window?.close() // triggers windowWillClose → AppActivation.end()
+    }
+
+    func windowWillClose(_ notification: Notification) {
         window = nil
+        AppActivation.end()
     }
 }

@@ -102,6 +102,8 @@ private struct StepRowView: View {
     @ViewBuilder
     private var field: some View {
         switch step.kind {
+        case .launchApp:
+            AppChooserField(appName: $step.text)
         case .keyboardShortcut:
             ShortcutRecorder(combo: $step.combo, display: $step.shortcutDisplay)
         case .runAppleScript, .runShell:
@@ -112,6 +114,73 @@ private struct StepRowView: View {
         default:
             TextField(step.kind.placeholder, text: $step.text)
                 .textFieldStyle(.roundedBorder)
+        }
+    }
+}
+
+/// Picks an installed app from a searchable popover list; stores the app name.
+private struct AppChooserField: View {
+    @Binding var appName: String
+
+    @State private var apps: [InstalledApp] = []
+    @State private var showing = false
+    @State private var query = ""
+
+    private var filtered: [InstalledApp] {
+        guard !query.isEmpty else { return apps }
+        return apps.filter { $0.name.localizedCaseInsensitiveContains(query) }
+    }
+
+    private var selectedPath: String? {
+        apps.first { $0.name == appName }?.path
+    }
+
+    var body: some View {
+        Button {
+            showing.toggle()
+        } label: {
+            HStack(spacing: 8) {
+                if let path = selectedPath {
+                    Image(nsImage: NSWorkspace.shared.icon(forFile: path))
+                        .resizable().frame(width: 18, height: 18)
+                }
+                Text(appName.isEmpty ? "Choose app…" : appName)
+                    .foregroundStyle(appName.isEmpty ? .secondary : .primary)
+                Spacer()
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 8).padding(.vertical, 6)
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+        }
+        .buttonStyle(.plain)
+        .task { if apps.isEmpty { apps = InstalledApps.all() } }
+        .popover(isPresented: $showing, arrowEdge: .bottom) {
+            VStack(spacing: 0) {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                    TextField("Search apps…", text: $query).textFieldStyle(.plain)
+                }
+                .padding(8)
+                Divider()
+                List(filtered) { app in
+                    Button {
+                        appName = app.name
+                        showing = false
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(nsImage: NSWorkspace.shared.icon(forFile: app.path))
+                                .resizable().frame(width: 20, height: 20)
+                            Text(app.name)
+                            Spacer()
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+                .listStyle(.plain)
+            }
+            .frame(width: 260, height: 320)
         }
     }
 }
