@@ -93,7 +93,12 @@ final class OverlayController {
 
     private func activate(_ item: MenuItem) {
         hide()
-        NSLog("Halo: activated '%@'", item.title)
+        guard let action = item.action else { return }
+        // Hide first, then execute on the next runloop turn so focus has fully
+        // returned to the underlying app before any keystroke/text injection.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            action.execute()
+        }
     }
 
     // MARK: - Event monitors
