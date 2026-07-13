@@ -1,15 +1,13 @@
 import AppKit
 import Carbon.HIToolbox
 
-/// Owns app-wide lifecycle: the menu-bar item, the global hot key, and the
-/// overlay controller.
+/// Owns app-wide lifecycle: the menu-bar item, the global hot key, the overlay
+/// controller, and the settings window.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private let overlay = OverlayController()
-
-    private var placementCenterItem: NSMenuItem?
-    private var placementCursorItem: NSMenuItem?
+    private let settings = SettingsController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupStatusItem()
@@ -36,9 +34,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupHotkey() {
         // Trigger: ⌥Tab. A Carbon hot key, so no Accessibility permission needed.
-        HotkeyManager.shared.onPressed = { [weak self] in
-            self?.overlay.toggle()
-        }
+        // Press/release both routed so the gesture setting can use either.
+        HotkeyManager.shared.onPressed = { [weak self] in self?.overlay.handlePress() }
+        HotkeyManager.shared.onReleased = { [weak self] in self?.overlay.handleRelease() }
         HotkeyManager.shared.register(keyCode: UInt32(kVK_Tab), modifiers: UInt32(optionKey))
     }
 
@@ -55,20 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(withTitle: "Halo — dev build", action: nil, keyEquivalent: "")
         menu.addItem(withTitle: "Press ⌥Tab to open", action: nil, keyEquivalent: "")
         menu.addItem(.separator())
-
-        let placementParent = NSMenuItem(title: "Open Menu", action: nil, keyEquivalent: "")
-        let placementMenu = NSMenu()
-        let centerItem = NSMenuItem(title: "At Center of Screen",
-                                    action: #selector(setPlacementCenter), keyEquivalent: "")
-        let cursorItem = NSMenuItem(title: "At Cursor",
-                                    action: #selector(setPlacementCursor), keyEquivalent: "")
-        placementMenu.addItem(centerItem)
-        placementMenu.addItem(cursorItem)
-        placementParent.submenu = placementMenu
-        menu.addItem(placementParent)
-        self.placementCenterItem = centerItem
-        self.placementCursorItem = cursorItem
-
+        menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
         menu.addItem(.separator())
         menu.addItem(
             withTitle: "Quit Halo",
@@ -76,23 +61,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             keyEquivalent: "q"
         )
         item.menu = menu
-
         self.statusItem = item
-        refreshPlacementChecks()
     }
 
-    @objc private func setPlacementCenter() {
-        AppSettings.placement = .center
-        refreshPlacementChecks()
-    }
-
-    @objc private func setPlacementCursor() {
-        AppSettings.placement = .cursor
-        refreshPlacementChecks()
-    }
-
-    private func refreshPlacementChecks() {
-        placementCenterItem?.state = AppSettings.placement == .center ? .on : .off
-        placementCursorItem?.state = AppSettings.placement == .cursor ? .on : .off
+    @objc private func openSettings() {
+        settings.show()
     }
 }
