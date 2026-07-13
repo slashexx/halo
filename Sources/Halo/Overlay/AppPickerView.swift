@@ -6,6 +6,7 @@ enum PickResult {
     case app(InstalledApp)
     case clipboard
     case newWorkflow
+    case link
 }
 
 /// A searchable list of installed apps with "New Workflow" pinned at the top.
@@ -62,6 +63,21 @@ struct AppPickerView: View {
                     } icon: {
                         Image(systemName: "doc.on.clipboard.fill")
                             .foregroundStyle(.tint)
+                    }
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    onPick(.link)
+                } label: {
+                    Label {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("Open Link or File").fontWeight(.semibold)
+                            Text("A website, file, or folder")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    } icon: {
+                        Image(systemName: "link").foregroundStyle(.tint)
                     }
                 }
                 .buttonStyle(.plain)

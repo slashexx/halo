@@ -24,15 +24,23 @@ enum ActionRunner {
         }
     }
 
-    /// Runs workflow steps in order, with a short gap between them so each step
-    /// (e.g. an app launch) has a moment to take effect before the next.
+    /// Runs workflow steps in order, pausing between them so each takes effect
+    /// before the next. Launches/opens get a longer pause so a following step
+    /// (e.g. Move Window) doesn't fire before the app's window exists.
     private static func runChain(_ steps: [HaloAction], from index: Int) {
         guard index < steps.count else { return }
         run(steps[index])
         let next = index + 1
         guard next < steps.count else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delayAfter(steps[index])) {
             runChain(steps, from: next)
+        }
+    }
+
+    private static func delayAfter(_ action: HaloAction) -> TimeInterval {
+        switch action {
+        case .launchApp, .openURL: return 1.1 // let the app / window come up
+        default: return 0.4
         }
     }
 

@@ -122,6 +122,7 @@ final class OverlayController {
             onActivateClip: { [weak self] index in self?.activateClip(index) },
             onEdit: { [weak self] index in self?.editSlot(index) },
             onEditWorkflow: { [weak self] index in self?.editWorkflow(index) },
+            onRename: { [weak self] index in self?.renameSlot(index) },
             onClear: { [weak self] index in self?.model.setSlot(index, to: nil) },
             onCloseClipboard: { [weak self] in self?.model.closeClipboard() },
             onDismiss: { [weak self] in self?.hide() }
@@ -181,6 +182,46 @@ final class OverlayController {
         hide()
     }
 
+    /// Quick one-field rename for any filled slot.
+    private func renameSlot(_ index: Int) {
+        guard var item = model.item(at: index) else { return }
+        hide()
+        guard let newName = promptText(title: "Rename",
+                                       message: "Enter a new name for “\(item.title)”.",
+                                       initial: item.title), !newName.isEmpty else { return }
+        item.title = newName
+        model.setSlot(index, to: item)
+    }
+
+    /// Modal one-field text prompt. Switches to a regular activation policy so
+    /// the field accepts typing (menu-bar agents otherwise can't focus it).
+    private func promptText(title: String, message: String, initial: String) -> String? {
+        AppActivation.begin()
+        defer { AppActivation.end() }
+
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+        field.stringValue = initial
+        alert.accessoryView = field
+        alert.layout()
+        alert.window.initialFirstResponder = field
+
+        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        return field.stringValue.trimmingCharacters(in: .whitespaces)
+    }
+
+    private func linkTitle(for target: String) -> String {
+        if let url = URL(string: target), let host = url.host {
+            return host.replacingOccurrences(of: "www.", with: "")
+        }
+        return (target as NSString).lastPathComponent
+    }
+
     /// Open the app picker to fill or replace a slot.
     private func editSlot(_ index: Int) {
         hide()
@@ -199,6 +240,16 @@ final class OverlayController {
                     title: "Clipboard",
                     icon: .symbol("doc.on.clipboard"),
                     kind: .clipboard
+                ))
+            case .link:
+                guard let target = self.promptText(
+                    title: "Open Link or File",
+                    message: "Enter a URL (https://…) or a file/folder path.",
+                    initial: ""), !target.isEmpty else { return }
+                self.model.setSlot(index, to: MenuItem(
+                    title: self.linkTitle(for: target),
+                    icon: .symbol("link"),
+                    action: .openURL(target)
                 ))
             case .newWorkflow:
                 self.openWorkflowEditor(index: index, name: "Workflow",
