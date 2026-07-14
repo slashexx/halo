@@ -1,9 +1,15 @@
-# Halo
+<p align="center">
+  <img src="assets/icon.png" width="128" alt="Halo icon">
+</p>
 
-**Everything at your cursor.** A fast, glassy pie / radial menu and automation
-tool for macOS. Press **⌥Tab** anywhere to summon a wheel and launch apps, run
-scripts, insert text, simulate shortcuts, control media, browse clipboard
-history, and chain multi-step workflows — without leaving what you're doing.
+<h1 align="center">Halo</h1>
+
+<p align="center"><b>Everything at your cursor.</b></p>
+
+A fast, glassy pie / radial menu and automation tool for macOS. Press **⌥Tab**
+anywhere to summon a wheel and launch apps, run scripts, insert text, simulate
+shortcuts, control media, browse clipboard history, and chain multi-step
+workflows — without leaving what you're doing.
 
 Native **Swift + SwiftUI**, built for **macOS 26 (Tahoe)** with real Liquid Glass
 materials. No Xcode required to build — pure Swift Package Manager.
