@@ -37,6 +37,20 @@ enum AppSettings {
     private static let gestureKey = "gestureMode"
     private static let clipboardDelayKey = "clipboardHoverDelay"
     private static let onboardedKey = "didOnboard"
+    private static let centerCursorKey = "centerCursorOnOpen"
+    private static let returnCursorKey = "returnCursorOnClose"
+
+    /// Warp the cursor to the wheel's center when it opens (drag out to pick).
+    static var centerCursorOnOpen: Bool {
+        get { UserDefaults.standard.bool(forKey: centerCursorKey) }
+        set { UserDefaults.standard.set(newValue, forKey: centerCursorKey) }
+    }
+
+    /// After the wheel closes, put the cursor back where it was.
+    static var returnCursorOnClose: Bool {
+        get { UserDefaults.standard.bool(forKey: returnCursorKey) }
+        set { UserDefaults.standard.set(newValue, forKey: returnCursorKey) }
+    }
 
     static var didOnboard: Bool {
         get { UserDefaults.standard.bool(forKey: onboardedKey) }

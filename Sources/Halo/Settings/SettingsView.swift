@@ -8,6 +8,8 @@ struct SettingsView: View {
     @State private var placement = AppSettings.placement
     @State private var clipboardDelay = AppSettings.clipboardHoverDelay
     @State private var launchAtLogin = LoginItem.isEnabled
+    @State private var centerCursor = AppSettings.centerCursorOnOpen
+    @State private var returnCursor = AppSettings.returnCursorOnClose
 
     var body: some View {
         Form {
@@ -38,12 +40,20 @@ struct SettingsView: View {
                 }
             }
 
+            Section("Cursor") {
+                Toggle("Move cursor to center on open", isOn: $centerCursor)
+                    .onChange(of: centerCursor) { _, on in AppSettings.centerCursorOnOpen = on }
+                Toggle("Return cursor to original position", isOn: $returnCursor)
+                    .onChange(of: returnCursor) { _, on in AppSettings.returnCursorOnClose = on }
+                    .disabled(!centerCursor)
+            }
+
             Section("General") {
                 Toggle("Launch Halo at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, on in LoginItem.setEnabled(on) }
             }
         }
         .formStyle(.grouped)
-        .frame(width: 440, height: 340)
+        .frame(width: 440, height: 440)
     }
 }

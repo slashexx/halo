@@ -19,6 +19,7 @@ final class OverlayController {
     private var scrollMonitor: Any?
     private var wasOptionDown = false
     private var lastScrollSwitch: TimeInterval = 0
+    private var savedCursor: CGPoint?   // for "return cursor" (CG global coords)
     private(set) var isVisible = false
 
     // Gesture state for hold-and-release / tap-to-stick.
@@ -96,6 +97,7 @@ final class OverlayController {
         panel.makeKey()
         isVisible = true
 
+        centerCursorIfEnabled(in: panel)
         installMonitors()
     }
 
@@ -104,7 +106,30 @@ final class OverlayController {
         panel?.orderOut(nil)
         isVisible = false
         awaitingClick = false
+        restoreCursorIfNeeded()
         removeMonitors()
+    }
+
+    // MARK: - Cursor centering (opt-in)
+
+    /// Global (top-left origin) CG point for an NSScreen (bottom-left) point.
+    private func cgPoint(fromScreen point: NSPoint) -> CGPoint {
+        let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
+        return CGPoint(x: point.x, y: primaryHeight - point.y)
+    }
+
+    private func centerCursorIfEnabled(in panel: OverlayPanel) {
+        guard AppSettings.centerCursorOnOpen else { savedCursor = nil; return }
+        savedCursor = cgPoint(fromScreen: NSEvent.mouseLocation)
+        let center = NSPoint(x: panel.frame.midX, y: panel.frame.midY)
+        CGWarpMouseCursorPosition(cgPoint(fromScreen: center))
+    }
+
+    private func restoreCursorIfNeeded() {
+        if AppSettings.returnCursorOnClose, let saved = savedCursor {
+            CGWarpMouseCursorPosition(saved)
+        }
+        savedCursor = nil
     }
 
     // MARK: - Setup
