@@ -72,8 +72,6 @@ final class RadialMenuModel: ObservableObject {
                      kind: .clipboard),
             MenuItem(title: "Terminal", icon: .symbol("terminal"),
                      action: .launchApp(name: "Terminal")),
-            MenuItem(title: "Snippet", icon: .symbol("text.badge.plus"),
-                     action: .insertText("Everything at your cursor. — Halo")),
             MenuItem(title: "Screenshot", icon: .symbol("camera.viewfinder"),
                      action: .keyboardShortcut(KeyCombo(keyCode: 21,
                                                         modifiers: [.maskCommand, .maskShift]))),
