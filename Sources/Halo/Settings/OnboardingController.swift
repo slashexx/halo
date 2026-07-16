@@ -5,8 +5,13 @@ import SwiftUI
 @MainActor
 final class OnboardingController: NSObject, NSWindowDelegate {
     private var window: NSWindow?
+    private var onFinish: (() -> Void)?
 
-    func show() {
+    /// - Parameter onFinish: called after the user taps "Get Started" (e.g. to
+    ///   demo the wheel), so the button visibly does something.
+    func show(onFinish: (() -> Void)? = nil) {
+        self.onFinish = onFinish
+
         if let window {
             NSApp.activate(ignoringOtherApps: true)
             window.makeKeyAndOrderFront(nil)
@@ -21,7 +26,7 @@ final class OnboardingController: NSObject, NSWindowDelegate {
         )
         window.title = "Welcome to Halo"
         window.contentView = NSHostingView(rootView: OnboardingView(onDone: { [weak self] in
-            self?.window?.close()
+            self?.finish()
         }))
         window.isReleasedWhenClosed = false
         window.delegate = self
@@ -30,6 +35,15 @@ final class OnboardingController: NSObject, NSWindowDelegate {
         self.window = window
         AppActivation.begin()
         window.makeKeyAndOrderFront(nil)
+    }
+
+    private func finish() {
+        let action = onFinish
+        window?.close() // fires windowWillClose → cleanup
+        // Demo the wheel just after the window closes / focus settles.
+        if let action {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { action() }
+        }
     }
 
     func windowWillClose(_ notification: Notification) {

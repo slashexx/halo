@@ -31,16 +31,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // First launch → welcome + permissions.
         if !AppSettings.didOnboard {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                self?.onboarding.show()
+                self?.showOnboarding()
             }
         }
+    }
+
+    private func showOnboarding() {
+        // "Get Started" closes the window and pops the wheel so it visibly works.
+        onboarding.show(onFinish: { [weak self] in self?.overlay.showAtScreenCenter() })
     }
 
     /// Halo is a menu-bar agent with no window, so opening it again from
     /// Spotlight/Finder/Dock would otherwise do nothing visible. Show the
     /// welcome window instead — it explains the menu-bar icon and ⌥Tab.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        onboarding.show()
+        showOnboarding()
         return true
     }
 
